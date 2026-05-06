@@ -1159,24 +1159,16 @@ function renderEAR(el){
 // ============= GREEKS =============
 function renderGreeks(el){
   const d = getFilteredData(RAW.greeks);
-  const last = d[d.length-1];
+  const lastVal = (k) => { for (let i=d.length-1;i>=0;i--) if (d[i][k]!=null) return {v:d[i][k],dt:d[i].d}; return null; };
+  const lastDe = lastVal('de'), lastGa = lastVal('ga'), lastVe = lastVal('ve')||lastVal('evw'), lastTh = lastVal('th');
 
   el.innerHTML = `
     <div class="kpi-row">
-      <div class="kpi"><div class="label">Delta</div><div class="value">${last.de!=null?(last.de*100).toFixed(1)+'%':'—'}</div></div>
-      <div class="kpi"><div class="label">Gamma (1% move)</div><div class="value">${last.ga!=null?(last.ga*100).toFixed(2)+'%':'—'}</div></div>
-      <div class="kpi"><div class="label">Vega (per vol pt)</div><div class="value">${last.ve!=null?last.ve.toFixed(1)+' bps':(last.evw!=null?last.evw.toFixed(1)+' bps':'—')}</div></div>
-      <div class="kpi"><div class="label">Theta (30d)</div><div class="value">${last.th!=null?last.th.toFixed(1)+' bps':'—'}</div></div>
+      <div class="kpi"><div class="label">Delta</div><div class="value">${lastDe?(lastDe.v*100).toFixed(1)+'%':'—'}</div>${lastDe?`<div class="change">${fmtDate(lastDe.dt)}</div>`:''}</div>
+      <div class="kpi"><div class="label">Gamma (1% move)</div><div class="value">${lastGa?(lastGa.v*100).toFixed(2)+'%':'—'}</div>${lastGa?`<div class="change">${fmtDate(lastGa.dt)}</div>`:''}</div>
+      <div class="kpi"><div class="label">Vega (per vol pt)</div><div class="value">${lastVe?lastVe.v.toFixed(1)+' bps':'—'}</div>${lastVe?`<div class="change">${fmtDate(lastVe.dt)}</div>`:''}</div>
+      <div class="kpi"><div class="label">Theta (30d)</div><div class="value">${lastTh?lastTh.v.toFixed(1)+' bps':'—'}</div>${lastTh?`<div class="change">${fmtDate(lastTh.dt)}</div>`:''}</div>
     </div>
-    <div class="charts-grid">
-      <div class="chart-card"><div class="chart-header"><h3>Delta Over Time</h3>${chartExportBtns("deltaChart","bg_fund_delta")}</div><div class="chart-wrap"><canvas id="deltaChart"></canvas></div></div>
-      <div class="chart-card"><div class="chart-header"><h3>Vega & Eq. Vega MW</h3>${chartExportBtns("vegaChart","bg_fund_vega")}</div><div class="chart-wrap"><canvas id="vegaChart"></canvas></div></div>
-      <div class="chart-card"><div class="chart-header"><h3>Gamma Over Time</h3>${chartExportBtns("gammaChart","bg_fund_gamma")}</div><div class="chart-wrap"><canvas id="gammaChart"></canvas></div></div>
-      <div class="chart-card"><div class="chart-header"><h3>Theta & Optional Theta</h3>${chartExportBtns("thetaChart","bg_fund_theta")}</div><div class="chart-wrap"><canvas id="thetaChart"></canvas></div></div>
-    </div>
-    <div class="table-header"><div class="section-title">Greeks Data (last 24)</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
-    <div class="table-wrap"><table id="greeksTable"></table></div>
-  `;
 
   const mkLine = (id,label,key,color,fmtFn) => {
     charts[id] = new Chart(document.getElementById(id),{
@@ -1185,6 +1177,7 @@ function renderGreeks(el){
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:10}}}}
     });
   };
+  
   // Delta with avg
   {
     const vals = d.map(r=>r.de!=null?r.de*100:null);
