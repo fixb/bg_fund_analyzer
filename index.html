@@ -191,16 +191,6 @@ select:focus{border-color:var(--accent)}
 
 
 /* Allocator */
-.alloc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:24px}
-.alloc-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.alloc-card .strat-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-.alloc-card .strat-name span{font-family:'JetBrains Mono',monospace;color:var(--accent2);font-size:13px}
-.alloc-slider{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:var(--surface3);outline:none;margin:8px 0}
-.alloc-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent2);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 6px rgba(59,130,246,.3)}
-.alloc-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent2);cursor:pointer;border:2px solid var(--bg)}
-.alloc-presets{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
-.alloc-presets button{padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text3);background:var(--surface2);border:1px solid var(--border);transition:all .15s;font-family:'DM Sans',sans-serif}
-.alloc-presets button:hover{color:var(--accent2);border-color:var(--accent)}
 .compare-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
 .compare-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
 .compare-card h4{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
@@ -536,7 +526,7 @@ function getFilteredData(arr) {
 }
 function applyPreset(preset) {
   state.preset = preset;
-  const dataKey = {nav:'nav',perf:'perf',exposure:'exp',ear:'ear',greeks:'greeks',leverage:'lev',cash:'cash',ifrs:'ifrs',analytics:'nav',corrbeta:'perf',perfstats:'nav',allocator:'perf'}[state.tab];
+  const dataKey = {nav:'nav',perf:'perf',exposure:'exp',ear:'ear',greeks:'greeks',leverage:'lev',cash:'cash',ifrs:'ifrs',analytics:'nav',corrbeta:'perf',perfstats:'nav'}[state.tab];
   const data = RAW[dataKey];
   if (!data || !data.length) return;
   const total = data.length;
@@ -693,11 +683,11 @@ function render(){
       </div>
     </div>
     <div class="tabs">
-      ${['nav','perf','exposure','ear','greeks','leverage','cash','ifrs','analytics','corrbeta','perfstats','allocator'].map(t=>
+      ${['nav','perf','exposure','ear','greeks','leverage','cash','ifrs','analytics','corrbeta','perfstats'].map(t=>
         `<div class="tab ${state.tab===t?'active':''}" onclick="state.tab='${t}';render()">${{
           nav:'📈 NAV & Performance',perf:'🎯 Attribution',exposure:'📊 Exposure',
           ear:'⚡ Equity at Risk',greeks:'Ω Greeks',leverage:'🔧 Leverage',
-          cash:'💰 Cash',ifrs:'📋 IFRS 13',analytics:'📐 Analytics',corrbeta:'🔗 Correlation & Beta',perfstats:'🏆 Perf Rankings',allocator:'🎛 Allocator'
+          cash:'💰 Cash',ifrs:'📋 IFRS 13',analytics:'📐 Analytics',corrbeta:'🔗 Correlation & Beta',perfstats:'🏆 Perf Rankings'
         }[t]}</div>`
       ).join('')}
     </div>
@@ -726,7 +716,7 @@ function render(){
   const content = document.getElementById('content');
 
   // Check if data exists for the tab
-  const tabDataMap = {nav:'nav',perf:'perf',exposure:'exp',ear:'ear',greeks:'greeks',leverage:'lev',cash:'cash',ifrs:'ifrs',analytics:'nav',corrbeta:'perf',perfstats:'nav',allocator:'perf'};
+  const tabDataMap = {nav:'nav',perf:'perf',exposure:'exp',ear:'ear',greeks:'greeks',leverage:'lev',cash:'cash',ifrs:'ifrs',analytics:'nav',corrbeta:'perf',perfstats:'nav'};
   const dataKey = tabDataMap[state.tab];
   if (!RAW[dataKey] || RAW[dataKey].length === 0) {
     content.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text3)"><p style="font-size:16px;margin-bottom:8px">No data available for this tab</p><p style="font-size:13px">Import a file with the required sheet to view this section</p></div>';
@@ -745,7 +735,6 @@ function render(){
     analytics: renderAnalytics,
     corrbeta: renderCorrBeta,
     perfstats: renderPerfStats,
-    allocator: renderAllocator,
   })[state.tab](content);
 }
 
@@ -2178,243 +2167,6 @@ function renderPerfStats(el) {
   document.getElementById('qHeatmap').innerHTML = qhHTML;
 }
 
-// ============= ALLOCATOR TAB =============
-function renderAllocator(el) {
-  const allPerf = RAW.perf;
-  const d = getFilteredData(allPerf);
-  if (!d || d.length < 2) {
-    el.innerHTML = '<p style="color:var(--text3);padding:40px;text-align:center">Not enough data</p>';
-    return;
-  }
-
-  const STRATS = [
-    {k:'mc', l:'Mandatory CB Arb',     cat:'Volatility', color:'#3b82f6'},
-    {k:'cb', l:'CB Arbitrage',          cat:'Volatility', color:'#60a5fa'},
-    {k:'vt', l:'Vol Trading',           cat:'Volatility', color:'#22d3ee'},
-    {k:'wa', l:'Warrant/Gamma',         cat:'Volatility', color:'#06b6d4'},
-    {k:'ra', l:'Risk Arb / Spec Sit',   cat:'Equity',     color:'#10b981'},
-    {k:'ls', l:'L/S Equity',            cat:'Equity',     color:'#14b8a6'},
-    {k:'cl', l:'Credit L/S',            cat:'Credit',     color:'#f59e0b'},
-    {k:'ca', l:'Cap Struct Arb',        cat:'Credit',     color:'#fb923c'},
-    {k:'cx', l:'Credit Special Sit',    cat:'Credit',     color:'#f97316'},
-    {k:'ts', l:'Trading',               cat:'Trading',    color:'#a78bfa'},
-  ];
-
-  const alloc = state.alloc;
-
-  el.innerHTML = `
-    <div class="alloc-presets">
-      <button onclick="setAllocPreset('equal')">Equal Weight (100%)</button>
-      <button onclick="setAllocPreset('actual')">Actual Fund (100%)</button>
-      <button onclick="setAllocPreset('vol_only')">Volatility Only</button>
-      <button onclick="setAllocPreset('event_only')">Event-Driven Only</button>
-      <button onclick="setAllocPreset('no_trading')">No Trading</button>
-      <button onclick="setAllocPreset('2x_vol')">2x Volatility</button>
-      <button onclick="setAllocPreset('zero')">All Zero</button>
-    </div>
-    <div class="alloc-grid" id="allocSliders"></div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:20px" id="allocInfo"></div>
-    <div class="compare-row" id="compareCards"></div>
-    <div class="charts-grid">
-      <div class="chart-card full"><div class="chart-header"><h3>Cumulative Performance — Custom vs Actual</h3>${chartExportBtns("allocCumChart","bg_alloc_cumul")}</div><div class="desc">Rebased to 100</div><div class="chart-wrap"><canvas id="allocCumCanvas"></canvas></div></div>
-      <div class="chart-card"><div class="chart-header"><h3>Monthly P&L — Custom Portfolio</h3>${chartExportBtns("allocBarChart","bg_alloc_monthly")}</div><div class="chart-wrap"><canvas id="allocBarCanvas"></canvas></div></div>
-      <div class="chart-card"><div class="chart-header"><h3>Drawdown Comparison</h3>${chartExportBtns("allocDDChart","bg_alloc_dd")}</div><div class="chart-wrap"><canvas id="allocDDCanvas"></canvas></div></div>
-    </div>
-    <div class="section-title">Monthly Attribution — Custom Portfolio (last 24)</div>
-    <div class="table-wrap"><table id="allocTable"></table></div>
-  `;
-
-  // Render sliders
-  const sliderDiv = document.getElementById('allocSliders');
-  let slidersHTML = '';
-  STRATS.forEach(s => {
-    const v = alloc[s.k];
-    slidersHTML += '<div class="alloc-card"><div class="strat-name">'+s.l+' <span id="allocVal_'+s.k+'">'+(v*100).toFixed(0)+'%</span></div>'
-      +'<input type="range" class="alloc-slider" min="0" max="3" step="0.05" value="'+v+'" '
-      +'style="background:linear-gradient(to right,'+s.color+' '+(v/3*100)+'%,var(--surface3) '+(v/3*100)+'%)" '
-      +'oninput="onAllocChange(\''+s.k+'\',this.value,this,\''+s.color+'\')">'
-      +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3)"><span>0%</span><span>'+s.cat+'</span><span>300%</span></div></div>';
-  });
-  sliderDiv.innerHTML = slidersHTML;
-
-  computeAllocator(d, STRATS);
-}
-
-function onAllocChange(key, val, slider, color) {
-  state.alloc[key] = parseFloat(val);
-  document.getElementById('allocVal_'+key).textContent = (val*100).toFixed(0)+'%';
-  slider.style.background = 'linear-gradient(to right,'+color+' '+(val/3*100)+'%,var(--surface3) '+(val/3*100)+'%)';
-  // Debounce recompute
-  clearTimeout(window._allocTimer);
-  window._allocTimer = setTimeout(() => {
-    const d = getFilteredData(RAW.perf);
-    const STRATS = [
-      {k:'mc',l:'Mandatory CB',color:'#3b82f6'},{k:'cb',l:'CB Arb',color:'#60a5fa'},
-      {k:'vt',l:'Vol Trading',color:'#22d3ee'},{k:'wa',l:'Warrant/Gamma',color:'#06b6d4'},
-      {k:'ra',l:'Risk Arb',color:'#10b981'},{k:'ls',l:'L/S Equity',color:'#14b8a6'},
-      {k:'cl',l:'Credit L/S',color:'#f59e0b'},{k:'ca',l:'Cap Struct',color:'#fb923c'},
-      {k:'cx',l:'Credit Spec',color:'#f97316'},{k:'ts',l:'Trading',color:'#a78bfa'},
-    ];
-    computeAllocator(d, STRATS);
-  }, 150);
-}
-
-function setAllocPreset(preset) {
-  const presets = {
-    equal:    {mc:1,cb:1,vt:1,wa:1,ra:1,ls:1,cl:1,ca:1,cx:1,ts:1},
-    actual:   {mc:1,cb:1,vt:1,wa:1,ra:1,ls:1,cl:1,ca:1,cx:1,ts:1},
-    vol_only: {mc:1,cb:1,vt:1,wa:1,ra:0,ls:0,cl:0,ca:0,cx:0,ts:0},
-    event_only:{mc:0,cb:0,vt:0,wa:0,ra:1,ls:1,cl:1,ca:1,cx:1,ts:0},
-    no_trading:{mc:1,cb:1,vt:1,wa:1,ra:1,ls:1,cl:1,ca:1,cx:1,ts:0},
-    '2x_vol': {mc:2,cb:2,vt:2,wa:2,ra:1,ls:1,cl:1,ca:1,cx:1,ts:1},
-    zero:     {mc:0,cb:0,vt:0,wa:0,ra:0,ls:0,cl:0,ca:0,cx:0,ts:0},
-  };
-  state.alloc = {...presets[preset]};
-  renderAllocator(document.getElementById('content'));
-}
-
-function computeAllocator(d, STRATS) {
-  const alloc = state.alloc;
-  const n = d.length;
-
-  // Compute custom monthly returns (bps) = sum of allocation * strategy bps
-  const customBps = d.map(r => {
-    return STRATS.reduce((sum, s) => sum + (r[s.k] || 0) * alloc[s.k], 0);
-  });
-  const actualBps = d.map(r => r.t || 0);
-
-  // Convert bps to returns for cumulative
-  const customRets = customBps.map(b => b / 10000);
-  const actualRets = actualBps.map(b => b / 10000);
-
-  // Cumulative (rebased 100)
-  let customCum = [100], actualCum = [100];
-  for (let i = 0; i < n; i++) {
-    customCum.push(customCum[i] * (1 + customRets[i]));
-    actualCum.push(actualCum[i] * (1 + actualRets[i]));
-  }
-
-  // Stats helper
-  function calcStats(rets, label) {
-    const months = rets.length;
-    const total = rets.reduce((a,b)=>a+b,0);
-    const mean = total / months;
-    const variance = rets.reduce((a,r)=>a+Math.pow(r-mean,2),0)/(months>1?months-1:1);
-    const vol = Math.sqrt(variance);
-    const annVol = vol * Math.sqrt(12);
-    const cumRet = rets.reduce((acc,r)=>(1+r)*acc,1) - 1;
-    const years = months / 12;
-    const annRet = years > 0 ? Math.pow(1+cumRet, 1/years)-1 : 0;
-    const sharpe = annVol > 0 ? (annRet - 0.02) / annVol : 0;
-    const down = rets.filter(r=>r<0);
-    const downDev = Math.sqrt(down.length>1 ? down.reduce((a,r)=>a+r*r,0)/down.length : 0) * Math.sqrt(12);
-    const sortino = downDev > 0 ? (annRet - 0.02) / downDev : 0;
-    let peak = 100, maxDD = 0;
-    let nav = 100;
-    for (const r of rets) {
-      nav *= (1 + r);
-      if (nav > peak) peak = nav;
-      const dd = (nav - peak) / peak;
-      if (dd < maxDD) maxDD = dd;
-    }
-    const calmar = maxDD < 0 ? annRet / Math.abs(maxDD) : 0;
-    const pos = rets.filter(r=>r>0).length;
-    const best = Math.max(...rets);
-    const worst = Math.min(...rets);
-    return { months, cumRet, annRet, annVol, sharpe, sortino, calmar, maxDD, pos, best, worst, mean };
-  }
-
-  const cStats = calcStats(customRets, 'Custom');
-  const aStats = calcStats(actualRets, 'Actual');
-
-  // Info
-  document.getElementById('allocInfo').innerHTML =
-    fmtDate(d[0].d) + ' \u2192 ' + fmtDate(d[n-1].d) + ' \u00b7 ' + n + ' months \u00b7 Total allocation weight: ' +
-    STRATS.reduce((s,st) => s + alloc[st.k], 0).toFixed(1) + 'x';
-
-  // Compare cards
-  function statCard(title, dotColor, st) {
-    const c = v => v >= 0 ? 'color:var(--green)' : 'color:var(--red)';
-    return '<div class="compare-card"><h4><span class="dot" style="background:'+dotColor+'"></span>'+title+'</h4>'
-      +'<div class="stat-row"><span class="label">Cumulative Return</span><span class="val" style="'+c(st.cumRet)+'">'+(st.cumRet*100).toFixed(2)+'%</span></div>'
-      +'<div class="stat-row"><span class="label">Annualized Return</span><span class="val" style="'+c(st.annRet)+'">'+(st.annRet*100).toFixed(2)+'%</span></div>'
-      +'<div class="stat-row"><span class="label">Annualized Vol</span><span class="val">'+(st.annVol*100).toFixed(2)+'%</span></div>'
-      +'<div class="stat-row"><span class="label">Sharpe (rf=2%)</span><span class="val" style="'+c(st.sharpe)+'">'+st.sharpe.toFixed(2)+'</span></div>'
-      +'<div class="stat-row"><span class="label">Sortino (rf=2%)</span><span class="val" style="'+c(st.sortino)+'">'+st.sortino.toFixed(2)+'</span></div>'
-      +'<div class="stat-row"><span class="label">Calmar</span><span class="val" style="'+c(st.calmar)+'">'+st.calmar.toFixed(2)+'</span></div>'
-      +'<div class="stat-row"><span class="label">Max Drawdown</span><span class="val" style="color:var(--red)">'+(st.maxDD*100).toFixed(2)+'%</span></div>'
-      +'<div class="stat-row"><span class="label">Best Month</span><span class="val" style="color:var(--green)">+'+(st.best*100).toFixed(2)+'%</span></div>'
-      +'<div class="stat-row"><span class="label">Worst Month</span><span class="val" style="color:var(--red)">'+(st.worst*100).toFixed(2)+'%</span></div>'
-      +'<div class="stat-row"><span class="label">% Positive</span><span class="val">'+(st.pos/st.months*100).toFixed(1)+'%</span></div>'
-      +'</div>';
-  }
-  document.getElementById('compareCards').innerHTML =
-    statCard('Custom Portfolio', '#3b82f6', cStats) + statCard('Actual Fund', '#f59e0b', aStats);
-
-  // Destroy old charts
-  ['allocCumChart','allocBarChart','allocDDChart'].forEach(k => { if(charts[k]) { try{charts[k].destroy()}catch(e){} } });
-
-  // Cumulative chart
-  const labels = ['Start', ...d.map(r=>fmtDate(r.d))];
-  charts['allocCumChart'] = new Chart(document.getElementById('allocCumCanvas'), {
-    type:'line',
-    data:{labels, datasets:[
-      {label:'Custom Portfolio',data:customCum,borderColor:'#3b82f6',borderWidth:2,fill:false,pointRadius:0},
-      {label:'Actual Fund',data:actualCum,borderColor:'#f59e0b',borderWidth:1.5,borderDash:[4,3],fill:false,pointRadius:0},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:12}},y:{beginAtZero:false,title:{display:true,text:'Rebased 100'}}}}
-  });
-
-  // Monthly bar
-  charts['allocBarChart'] = new Chart(document.getElementById('allocBarCanvas'), {
-    type:'bar',
-    data:{labels:d.map(r=>fmtDate(r.d)), datasets:[{
-      label:'Custom bps', data:customBps,
-      backgroundColor:customBps.map(v=>v>=0?'rgba(59,130,246,.6)':'rgba(239,68,68,.6)'), borderRadius:2
-    }]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:12}},y:{title:{display:true,text:'bps'}}}}
-  });
-
-  // Drawdown comparison
-  function ddSeries(rets) {
-    let peak = 100, nav = 100, dd = [0];
-    for (const r of rets) {
-      nav *= (1+r);
-      if (nav > peak) peak = nav;
-      dd.push(((nav-peak)/peak)*100);
-    }
-    return dd;
-  }
-  charts['allocDDChart'] = new Chart(document.getElementById('allocDDCanvas'), {
-    type:'line',
-    data:{labels, datasets:[
-      {label:'Custom DD',data:ddSeries(customRets),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)',fill:true,borderWidth:1.5,pointRadius:0},
-      {label:'Actual DD',data:ddSeries(actualRets),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.05)',fill:true,borderWidth:1,borderDash:[4,3],pointRadius:0},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:12}},y:{ticks:{callback:v=>v.toFixed(1)+'%'}}}}
-  });
-
-  // Attribution table
-  const recent = d.slice(-24).reverse();
-  let tHTML = '<thead><tr><th>Date</th>';
-  STRATS.forEach(s => tHTML += '<th>'+s.l+' ('+((alloc[s.k])*100).toFixed(0)+'%)</th>');
-  tHTML += '<th>Custom Total</th><th>Actual</th></tr></thead><tbody>';
-  recent.forEach(r => {
-    const customT = STRATS.reduce((s,st) => s + (r[st.k]||0)*alloc[st.k], 0);
-    const cc = customT >= 0 ? 'color:var(--green)' : 'color:var(--red)';
-    const ac = (r.t||0) >= 0 ? 'color:var(--green)' : 'color:var(--red)';
-    tHTML += '<tr><td>'+fmtDate(r.d)+'</td>';
-    STRATS.forEach(st => {
-      const v = (r[st.k]||0) * alloc[st.k];
-      const vc = v > 0 ? 'color:var(--green)' : v < 0 ? 'color:var(--red)' : '';
-      tHTML += '<td style="'+vc+'">'+v.toFixed(1)+'</td>';
-    });
-    tHTML += '<td style="font-weight:600;'+cc+'">'+customT.toFixed(1)+'</td>';
-    tHTML += '<td style="'+ac+'">'+(r.t||0).toFixed(1)+'</td></tr>';
-  });
-  tHTML += '</tbody>';
-  document.getElementById('allocTable').innerHTML = tHTML;
-}
 // ============= INIT =============
 // Apply default 3Y window
 (function initDefault() {
