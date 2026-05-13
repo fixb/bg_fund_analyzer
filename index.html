@@ -1904,7 +1904,7 @@ function renderPerfStats(el) {
   const ccy = state.currency;
   const cp = ccy[0];
   const baseKey = cp+'b';
-  const rollPeriod = state.rollPeriod || '1m';
+  const rollPeriod = state.rollPeriod || '3m';
 
   const d = getFilteredData(allNav).filter(r => r[baseKey] != null);
   if (d.length < 2) {
