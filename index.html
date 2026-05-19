@@ -1065,22 +1065,22 @@ function renderPerf(el){
 
   // ====== TRANSCO REFERENCE TABLE ======
   const transco = [
-    ['Mandatory CB Arb (mc)','Volatility','Long Vol','Protection — Volatility','Mandatory convertible bond arbitrage'],
-    ['CB Arbitrage (cb)','Volatility','Long Vol','Protection — Volatility','Convertible bond arbitrage'],
-    ['Vol Trading (vt)','Volatility','Overlay Vol','Protection — Volatility','Gamma Trading'],
-    ['Warrant/Gamma Arb (wa)','Volatility','Long Vol','Protection — Volatility','Gamma Trading'],
-    ['Risk Arb / Spec Sit (ra)','Equity','Event-Driven','Event Driven','Risk Arbitrage / Special Situations'],
-    ['Long/Short Equity (ls)','Equity','Event-Driven','Event Driven','Value with Catalyst / Value'],
-    ['Credit L/S (cl)','Credit','Event-Driven','Event Driven','Credit Long / Short'],
-    ['Cap Struct Arb (ca)','Credit','Event-Driven','Event Driven','Capital Structure Arbitrage'],
-    ['Credit Special Sit (cx)','Credit','Event-Driven','Event Driven','Credit Long / Short'],
-    ['Trading (ts)','Trading','Mixed*','Mixed*','Trading + Overlays'],
+    ['Mandatory CB Arb (mc)','Volatility','Long Vol','Protection — Volatility'],
+    ['CB Arbitrage (cb)','Volatility','Long Vol','Protection — Volatility'],
+    ['Vol Trading (vt)','Volatility','Overlay Vol','Protection — Volatility'],
+    ['Warrant/Gamma Arb (wa)','Volatility','Long Vol','Protection — Volatility'],
+    ['Risk Arb / Spec Sit (ra)','Equity','Event-Driven','Event Driven'],
+    ['Long/Short Equity (ls)','Equity','Event-Driven','Event Driven'],
+    ['Credit L/S (cl)','Credit','Event-Driven','Event Driven'],
+    ['Cap Struct Arb (ca)','Credit','Event-Driven','Event Driven'],
+    ['Credit Special Sit (cx)','Credit','Event-Driven','Event Driven'],
+    ['Trading (ts)','Trading','Mixed*','Mixed*'],
   ];
-  let trHTML = '<thead><tr><th>Perf Column</th><th>Asset Class</th><th>Strat Bucket</th><th>Main Strategy</th><th>Darius</th></tr></thead><tbody>';
+  let trHTML = '<thead><tr><th>Perf Column</th><th>Asset Class</th><th>Strat Bucket</th><th>Main Strategy</th></tr></thead><tbody>';
   transco.forEach(r => {
     trHTML += `<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`;
   });
-  trHTML += '</tbody><tfoot><tr><td colspan="5" style="font-size:10px;color:var(--text3);padding:10px">* Trading subtotal aggregates Event-Driven trading, Overlay Macro, Overlay EQT, Index Arb, and CTA — cannot be split from historical data</td></tr></tfoot>';
+  trHTML += '</tbody><tfoot><tr><td colspan="4" style="font-size:10px;color:var(--text3);padding:10px">* Trading subtotal aggregates Event-Driven trading, Overlay Macro, Overlay EQT, Index Arb, and CTA — cannot be split from historical data</td></tr></tfoot>';
   document.getElementById('transcoTable').innerHTML = trHTML;
 }
 
