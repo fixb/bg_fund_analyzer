@@ -851,6 +851,27 @@ function renderPerf(el){
   const d = getFilteredData(RAW.perf);
   const last = d[d.length-1];
   const view = state.perfView || 'nl_strat';
+  const kpiPeriod = state.perfKpiPeriod || '1M';
+
+  // Slice the filtered data for the KPI banner based on selected period
+  function getKpiSlice(arr, period) {
+    if (!arr || !arr.length) return arr || [];
+    if (period === 'ALL') return arr;
+    if (period === 'YTD') {
+      const year = arr[arr.length-1].d.slice(0,4);
+      const idx = arr.findIndex(r => r.d.slice(0,4) === year);
+      return idx >= 0 ? arr.slice(idx) : arr;
+    }
+    const n = {'1M':1, '3M':3, '6M':6, '12M':12}[period] || 1;
+    return arr.slice(-Math.min(n, arr.length));
+  }
+  const kpiSlice = getKpiSlice(d, kpiPeriod);
+  const kpiFrom = kpiSlice[0];
+  const kpiTo = kpiSlice[kpiSlice.length-1];
+  const periodLabels = {'1M':'Last Month','3M':'Last 3M','6M':'Last 6M','YTD':'YTD','12M':'Last 12M','ALL':'Selected Range'};
+  const periodRangeStr = kpiSlice.length > 1
+    ? fmtDate(kpiFrom.d) + ' → ' + fmtDate(kpiTo.d)
+    : fmtDate(kpiTo.d);
 
   // ====== TRANSCO MAPPINGS ======
   // Map perf data columns (Nl Strat level) to higher groupings
@@ -913,23 +934,34 @@ function renderPerf(el){
     return grp.subs.reduce((s, k) => s + (r[k] || 0), 0);
   }
 
-  // KPIs for current view
-  const kpiHTML = V.groups.map(g => {
-    const v = grpVal(last, g);
-    const c = v >= 0 ? 'color:var(--green)' : v < 0 ? 'color:var(--red)' : '';
-    return `<div class="kpi"><div class="label">${g.label}</div><div class="value" style="${c}">${v.toFixed(1)} bps</div></div>`;
-  }).join('');
+  // KPIs for current view — summed over the selected period
+  function sumGrp(slice, grp) {
+    return slice.reduce((s, r) => s + grpVal(r, grp), 0);
+  }
+  const kpiTotal = kpiSlice.reduce((s, r) => s + (r.t || 0), 0);
+
+  const KPI_PERIODS = ['1M','3M','6M','YTD','12M','ALL'];
 
   el.innerHTML = `
-    <div class="controls" style="gap:14px;align-items:center">
+    <div class="controls" style="gap:14px;align-items:center;flex-wrap:wrap">
       <label style="font-size:12px;color:var(--text2)">Grouping</label>
       <select id="perfViewSel" onchange="state.perfView=this.value;renderPerf(document.getElementById('content'))">
         ${Object.entries(VIEWS).map(([k,v]) => `<option value="${k}" ${k===view?'selected':''}>${v.label}</option>`).join('')}
       </select>
+      <label style="font-size:12px;color:var(--text2);margin-left:18px">KPI Period</label>
+      <select id="perfKpiPeriodSel" onchange="state.perfKpiPeriod=this.value;renderPerf(document.getElementById('content'))">
+        ${KPI_PERIODS.map(k => `<option value="${k}" ${k===kpiPeriod?'selected':''}>${periodLabels[k]}</option>`).join('')}
+      </select>
+      <span style="font-size:11px;color:var(--text2)">${periodRangeStr}</span>
     </div>
-    <div class="kpi-row" style="margin-bottom:8px">
-      <div class="kpi"><div class="label">Total (${fmtDate(last.d)})</div><div class="value ${colorVal(last.t)}">${(last.t||0).toFixed(1)} bps</div></div>
-      ${kpiHTML}
+    <div class="kpi-row" style="margin-bottom:8px;${V.groups.length > 6 ? 'grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px' : ''}">
+      <div class="kpi" style="${V.groups.length > 6 ? 'padding:12px 14px' : ''}"><div class="label">Total — ${periodLabels[kpiPeriod]}</div><div class="value ${colorVal(kpiTotal)}">${kpiTotal.toFixed(1)} bps</div></div>
+      ${V.groups.map(g => {
+        const v = sumGrp(kpiSlice, g);
+        const c = v >= 0 ? 'color:var(--green)' : v < 0 ? 'color:var(--red)' : '';
+        const pad = V.groups.length > 6 ? 'padding:12px 14px;' : '';
+        return `<div class="kpi" style="${pad}"><div class="label">${g.label}</div><div class="value" style="${c}">${v.toFixed(1)} bps</div></div>`;
+      }).join('')}
     </div>
     <div class="charts-grid">
       <div class="chart-card full tall"><div class="chart-header"><h3>${V.label} — Monthly Attribution (bps)</h3>${chartExportBtns("perfStack","bg_attrib_"+view)}</div><div class="desc">Stacked bar decomposition</div><div class="chart-wrap"><canvas id="perfStackChart"></canvas></div></div>
