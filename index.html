@@ -190,6 +190,21 @@ select:focus{border-color:var(--accent)}
 .window-pill.active{color:var(--accent2);border-color:var(--accent);background:rgba(59,130,246,.1)}
 
 
+/* Glossary footer */
+.glossary{margin-top:32px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.glossary>summary{padding:14px 20px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.5px;text-transform:uppercase;list-style:none;display:flex;align-items:center;gap:8px;user-select:none;transition:color .15s}
+.glossary>summary::-webkit-details-marker{display:none}
+.glossary>summary:hover{color:var(--accent2)}
+.glossary>summary::before{content:"+";display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;font-size:14px;color:var(--text3);transition:transform .2s}
+.glossary[open]>summary::before{content:"\2212"}
+.glossary>summary .gloss-hint{margin-left:auto;font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0}
+.glossary .gloss-body{padding:8px 20px 20px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:6px 28px;font-size:12px;color:var(--text2);line-height:1.5}
+.glossary .gloss-body dt{color:var(--accent2);font-weight:600;font-family:'JetBrains Mono',monospace;font-size:11.5px;padding-top:8px}
+.glossary .gloss-body dd{color:var(--text2);padding-bottom:6px;border-bottom:1px dashed var(--border)}
+.glossary .gloss-body dd:last-of-type{border-bottom:none}
+.glossary .gloss-note{padding:10px 20px 16px;font-size:11px;color:var(--text3);font-style:italic;border-top:1px dashed var(--border)}
+@media(max-width:600px){.glossary .gloss-body{grid-template-columns:1fr}}
+
 /* Allocator */
 .compare-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
 .compare-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
@@ -663,6 +678,150 @@ function chartExportBtns(chartId, filename) {
     + '</div>';
 }
 
+// ============= GLOSSARY =============
+const GLOSSARY = {
+  nav: {
+    title: 'Glossary — NAV & Performance',
+    items: [
+      ['NAV', 'Net Asset Value — per-share value of the fund (assets minus liabilities, divided by shares outstanding).'],
+      ['AUM', 'Assets Under Management — total market value of all investments managed by the fund (here in EUR millions).'],
+      ['MTD', 'Month-to-Date return — performance over the current/last month.'],
+      ['YTD', 'Year-to-Date return — performance since 1 January of the current year.'],
+      ['Base 100', 'Performance index rebased so that the starting NAV equals 100, making cumulative performance easy to read.'],
+      ['Vol (Ann.) / 1Y Vol', 'Annualized volatility — standard deviation of monthly returns scaled by √12. The 1Y figure is computed over a trailing 12-month window.'],
+      ['USD / EUR currency switch', 'Toggles between the fund’s USD and EUR share-class NAV and returns. Each share class hedges its base currency, so returns differ slightly.'],
+    ]
+  },
+  perf: {
+    title: 'Glossary — Performance Attribution',
+    items: [
+      ['bps', 'Basis points — 1 bp = 0.01% (one hundredth of a percent). Attribution is reported in bps to keep small monthly contributions readable.'],
+      ['P&L', 'Profit and Loss — the monetary or percentage gain/loss attributed to a strategy or to the whole fund over the period.'],
+      ['Mandatory CB Arb (mc)', 'Arbitrage around mandatory convertible bonds — bonds that automatically convert into equity at maturity.'],
+      ['CB Arbitrage (cb)', 'Convertible Bond Arbitrage — long the convertible bond, short the underlying equity to isolate volatility, credit and rates exposure.'],
+      ['Vol Trading (vt)', 'Directional or relative-value trading of listed/OTC options to express views on implied vs realized volatility.'],
+      ['Warrant / Gamma Arb (wa)', 'Arbitrage of warrants and gamma scalping — extracting value from convexity (gamma) by dynamically hedging delta.'],
+      ['Risk Arb / Spec Sit (ra)', 'Merger / Risk Arbitrage and Special Situations — long target / short acquirer in announced deals, plus event-driven equity trades.'],
+      ['L/S Equity (ls)', 'Long/Short Equity — long undervalued names, short overvalued ones, typically with modest net exposure.'],
+      ['Credit L/S (cl)', 'Credit Long/Short — long and short positions in bonds, CDS or loans expressing views on issuer credit quality.'],
+      ['Cap Struct Arb (ca)', 'Capital Structure Arbitrage — exploits relative-value dislocations between different instruments of the same issuer (e.g., bond vs equity, senior vs subordinated).'],
+      ['Credit Special Sit (cx)', 'Credit Special Situations — distressed, restructuring, event-driven credit trades.'],
+      ['Trading (ts)', 'Trading book — aggregates Event-Driven trading, Macro/Equity overlays, Index Arbitrage and CTA; cannot be decomposed historically.'],
+      ['Vol / Equity / Credit Subtotal', 'Newsletter-style groupings: Vol = mc+cb+vt+wa, Equity = ra+ls, Credit = cl+ca+cx.'],
+      ['Long Vol bucket', 'Strategies that benefit from rising volatility or convexity (mc + cb + wa).'],
+      ['Event Driven bucket', 'Equity + credit strategies driven by corporate events (mergers, restructurings, special situations).'],
+    ]
+  },
+  exposure: {
+    title: 'Glossary — Exposure',
+    items: [
+      ['Gross Exposure', '|Long| + |Short| as a % of NAV — total market footprint of the book, ignoring direction.'],
+      ['Net Exposure', 'Long − Short as a % of NAV — directional bias of the portfolio.'],
+      ['Long', 'Sum of long market values / NAV. Positive directional exposure.'],
+      ['Short', 'Sum of short market values / NAV. Negative directional exposure (shown as a positive number).'],
+      ['Strategy breakdown', 'Allocation by strategy bucket (CB Arb, Vol Trading, Equity, Credit L/S, Cap Struct, Trading, Quant Equity, Systematic).'],
+    ]
+  },
+  ear: {
+    title: 'Glossary — Equity at Risk (EAR)',
+    items: [
+      ['EAR (Equity at Risk)', 'Internal risk measure expressing the equity-equivalent exposure of the book — the share of NAV that behaves like a directional equity holding once non-linearities and hedges are accounted for.'],
+      ['Total EAR', 'Sum of EAR across all strategy buckets.'],
+      ['EAR by strategy', 'Decomposition of Total EAR into Volatility, Equity, Credit and Trading buckets.'],
+    ]
+  },
+  greeks: {
+    title: 'Glossary — Greeks & Sensitivities',
+    items: [
+      ['Delta (Δ)', 'First-order sensitivity of the portfolio value to a 1% move in the underlying equity market. A delta of 20% means the book moves like a +20% net equity position.'],
+      ['Gamma (Γ)', 'Rate of change of delta. Here expressed as the delta change induced by a 1% move in the underlying — i.e. the convexity of the book.'],
+      ['Vega (ν)', 'Sensitivity to implied volatility, expressed in bps of NAV per 1 vol point (1 vol pt = 1% change in implied vol).'],
+      ['Eq. Vega MW (incl. CBs)', 'Equity Vega Money-Weighted, including convertible bonds — vega scaled by position size, with CB optionality folded in.'],
+      ['Theta (Θ)', 'Time decay over a 30-day horizon, in bps of NAV. Negative theta means the book loses value as time passes (everything else equal).'],
+      ['Optional Theta', 'Theta contribution from option-like positions only (excluding linear instruments).'],
+      ['IR Sens. (1%)', 'Interest Rate sensitivity — P&L impact of a parallel +1% (100 bps) shift in the yield curve, expressed in bps of NAV (DV01-style).'],
+      ['Credit Sens.', 'Sensitivity to credit spread widening — P&L impact of a credit spread shock, in % of NAV.'],
+    ]
+  },
+  leverage: {
+    title: 'Glossary — Leverage',
+    items: [
+      ['AIFMD', 'Alternative Investment Fund Managers Directive — EU regulation requiring funds to report leverage under two standard methods (Commitment and Gross).'],
+      ['Commitment leverage', 'Regulatory leverage method that allows netting and hedging arrangements to reduce exposure (more economic view).'],
+      ['Gross leverage', 'Sum of the absolute values of all positions (longs + shorts + notional of derivatives) divided by NAV — does not allow netting.'],
+      ['Current vs Max', 'Current = leverage at month-end. Max = highest intra-month leverage observed during the reporting period.'],
+      ['x', 'Multiple of NAV. A value of 2.5x means total exposure is 2.5 times the fund’s NAV.'],
+    ]
+  },
+  cash: {
+    title: 'Glossary — Cash',
+    items: [
+      ['Unencumbered Cash', 'Cash that is free of pledges, margin calls or collateral obligations — immediately available to fund redemptions or new trades.'],
+      ['Total Cash & Equivalents', 'All cash plus highly liquid short-term instruments (T-bills, money-market funds, overnight deposits).'],
+      ['Figures shown', 'Both metrics are expressed as a percentage of NAV.'],
+    ]
+  },
+  ifrs: {
+    title: 'Glossary — IFRS 13 Fair Value Hierarchy',
+    items: [
+      ['IFRS 13', 'International Financial Reporting Standard 13 — Fair Value Measurement. Classifies positions into three levels based on the observability of pricing inputs.'],
+      ['Level 1', 'Quoted prices in active markets for identical assets (e.g., listed equities, on-the-run government bonds). Most transparent.'],
+      ['Level 2', 'Inputs other than Level 1 quoted prices that are observable (e.g., similar instruments, model prices using market inputs such as swap curves, vol surfaces).'],
+      ['Level 3', 'Significant unobservable inputs — model-based valuations using internal assumptions (illiquid credit, bespoke derivatives). Higher valuation uncertainty.'],
+      ['Assets vs Liabilities', 'Same classification applied to both sides of the balance sheet (longs vs short / derivative liabilities).'],
+    ]
+  },
+  analytics: {
+    title: 'Glossary — Analytics',
+    items: [
+      ['Cumulative Return', 'Total compounded return over the selected period: NAV_end / NAV_start − 1.'],
+      ['Annualized Return', 'Cumulative return rescaled to a 1-year basis: (1 + cum)^(1/years) − 1.'],
+      ['Realized Vol (Ann.)', 'Annualized standard deviation of monthly returns × √12.'],
+      ['Sharpe Ratio', '(Annualized Return − Risk-Free Rate) / Annualized Vol. Measures excess return per unit of total risk. Risk-free rate fixed at 2%.'],
+      ['Sortino Ratio', 'Like Sharpe but uses downside deviation (only negative monthly returns) in the denominator — penalizes losses, not upside volatility.'],
+      ['Calmar Ratio', 'Annualized Return / |Max Drawdown|. Higher = better return for the worst observed loss.'],
+      ['Max Drawdown', 'Largest peak-to-trough decline of the Base 100 index over the period. Peak, trough and recovery dates are reported.'],
+      ['Recovery', 'Date at which the index first returned to the previous peak after the trough (or "Not recovered" if still below).'],
+      ['% Positive Months', 'Share of months with a strictly positive return.'],
+      ['Monthly Return Distribution', 'Histogram of monthly returns binned in 0.5% buckets.'],
+    ]
+  },
+  corrbeta: {
+    title: 'Glossary — Correlation & Beta',
+    items: [
+      ['Pearson Correlation', 'Linear correlation coefficient between two return series, bounded in [−1, +1]. 0 = no linear relationship.'],
+      ['Beta (β)', 'Slope of the regression of a strategy’s returns on a reference series (here the Total Fund). β = 1 means the strategy moves 1-for-1 with the reference.'],
+      ['Cross-Beta Matrix', 'Beta of each row strategy regressed against each column strategy — asymmetric (β(A,B) ≠ β(B,A)).'],
+      ['Rolling 36m', 'Statistics recomputed on a sliding 36-month window, end-anchored at each date — shows how relationships change over time.'],
+      ['Contribution (%)', 'Sum of a strategy’s bps / Sum of Total Fund bps over the window — share of total P&L.'],
+      ['Sharpe*', 'Simplified Sharpe = (Mean × 12) / Annualized Vol, with no risk-free rate subtracted. Useful for ranking strategies internally.'],
+      ['Avg row / column', 'Mean of off-diagonal cells — gives a sense of average pairwise correlation/beta. Grand Avg = global off-diagonal mean.'],
+    ]
+  },
+  perfstats: {
+    title: 'Glossary — Performance Rankings',
+    items: [
+      ['Rolling Return', 'Total return computed over a fixed look-back window (e.g., 3 months), recomputed at each month-end. Each window produces one observation.'],
+      ['Annualized (≥ 1Y)', 'For windows of 1 year or more, returns are reported on an annualized basis: (end/start)^(12/n) − 1.'],
+      ['Rank / Percentile', 'Position of the latest rolling window vs all historical rolling windows of the same length. 95th percentile = better than 95% of past observations.'],
+      ['σ (sigma)', 'Standard deviation of the rolling-return distribution. ±1σ brackets contain ~68% of observations under a normal assumption.'],
+      ['Best / Worst window', 'Highest and lowest rolling returns ever observed over the selected window length.'],
+      ['Quarterly Heatmap', 'Compounded quarterly returns by calendar year (Q1–Q4) plus the compounded annual return.'],
+      ['Monthly / Quarterly Stats', 'Reference statistics computed at the monthly and quarterly frequency respectively, independent of the rolling-period selector.'],
+    ]
+  },
+};
+
+function renderGlossary(tabKey) {
+  const g = GLOSSARY[tabKey];
+  if (!g) return '';
+  const items = g.items.map(([term, def]) => '<dt>'+term+'</dt><dd>'+def+'</dd>').join('');
+  return '<details class="glossary">'
+    + '<summary>'+g.title+'<span class="gloss-hint">click to expand</span></summary>'
+    + '<dl class="gloss-body">'+items+'</dl>'
+    + '</details>';
+}
+
 // ============= RENDER =============
 function render(){
   destroyCharts();
@@ -774,6 +933,7 @@ function renderNav(el){
     <div class="table-wrap"><table id="annualTable"></table></div>
     <div class="table-header"><div class="section-title">Monthly NAV Data (last 24 months)</div></div>
     <div class="table-wrap"><table id="navTable"></table></div>
+    ${renderGlossary('nav')}
   `;
 
   const navDates = d.filter(r=>r[baseKey]).map(r=>fmtDate(r.d));
@@ -974,6 +1134,7 @@ function renderPerf(el){
     <div class="table-wrap"><table id="perfTable"></table></div>
     <div class="section-title" style="margin-top:24px">Strategy Mapping Reference</div>
     <div class="table-wrap"><table id="transcoTable"></table></div>
+    ${renderGlossary('perf')}
   `;
 
   // ====== STACKED BAR ======
@@ -1103,6 +1264,7 @@ function renderExposure(el){
     </div>
     <div class="table-header"><div class="section-title">Exposure Data (last 24)</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
     <div class="table-wrap"><table id="expTable"></table></div>
+    ${renderGlossary('exposure')}
   `;
 
   charts.exp = new Chart(document.getElementById('expChart'),{
@@ -1166,6 +1328,7 @@ function renderEAR(el){
       <div class="chart-card full"><div class="chart-header"><h3>Total Equity at Risk Evolution</h3>${chartExportBtns("ear","bg_fund_ear")}</div><div class="chart-wrap"><canvas id="earChart"></canvas></div></div>
       <div class="chart-card full"><div class="chart-header"><h3>EAR by Strategy</h3>${chartExportBtns("earStack","bg_fund_ear_strategy")}</div><div class="desc">Stacked area breakdown</div><div class="chart-wrap"><canvas id="earStackChart"></canvas></div></div>
     </div>
+    ${renderGlossary('ear')}
   `;
 
   charts.ear = new Chart(document.getElementById('earChart'),{
@@ -1210,6 +1373,7 @@ function renderGreeks(el){
     </div>
     <div class="table-header"><div class="section-title">Greeks Data (last 24)</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
     <div class="table-wrap"><table id="greeksTable"></table></div>
+    ${renderGlossary('greeks')}
   `;
 
   const mkLine = (id,label,key,color,fmtFn) => {
@@ -1301,6 +1465,7 @@ function renderLeverage(el){
     <div class="charts-grid">
       <div class="chart-card full"><div class="chart-header"><h3>AIFMD Leverage — Commitment & Gross</h3>${chartExportBtns("lev","bg_fund_leverage")}</div><div class="chart-wrap"><canvas id="levChart"></canvas></div></div>
     </div>
+    ${renderGlossary('leverage')}
   `;
 
   charts.lev = new Chart(document.getElementById('levChart'),{
@@ -1331,6 +1496,7 @@ function renderCash(el){
     <div class="charts-grid">
       <div class="chart-card full"><div class="chart-header"><h3>Cash & Cash Equivalents Over Time</h3>${chartExportBtns("cash","bg_fund_cash")}</div><div class="chart-wrap"><canvas id="cashChart"></canvas></div></div>
     </div>
+    ${renderGlossary('cash')}
   `;
 
   charts.cash = new Chart(document.getElementById('cashChart'),{
@@ -1363,6 +1529,7 @@ function renderIFRS(el){
       <div class="chart-card"><div class="chart-header"><h3>Level 3 Assets Over Time</h3>${chartExportBtns("l3","bg_fund_level3")}</div><div class="desc">Illiquid / model-valued positions</div><div class="chart-wrap"><canvas id="l3Chart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Asset vs Liability Breakdown (Latest)</h3>${chartExportBtns("ifrsBar","bg_fund_ifrs_breakdown")}</div><div class="chart-wrap"><canvas id="ifrsBarChart"></canvas></div></div>
     </div>
+    ${renderGlossary('ifrs')}
   `;
 
   charts.ifrs = new Chart(document.getElementById('ifrsChart'),{
@@ -1433,6 +1600,7 @@ function renderAnalytics(el) {
       </div>
     </div>
     <div id="analyticsResults"></div>
+    ${renderGlossary('analytics')}
   `;
 
   document.getElementById('analyticsFrom').value = iFrom;
@@ -1732,6 +1900,7 @@ function renderCorrBeta(el) {
       <div class="desc">Summary stats for each group over the selected window</div>
       <div class="heatmap-wrap"><table class="heatmap" id="stratStats"></table></div>
     </div>
+    ${renderGlossary('corrbeta')}
   `;
 
   // ====== COMPUTE SERIES ======
@@ -2098,6 +2267,7 @@ function renderPerfStats(el) {
 
     <div class="section-title">Quarterly Performance Heatmap</div>
     <div class="table-wrap"><table class="heatmap" id="qHeatmap"></table></div>
+    ${renderGlossary('perfstats')}
   `;
 
   // ====== HISTOGRAM ======
