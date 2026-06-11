@@ -1576,9 +1576,11 @@ function renderAnalytics(el) {
   // Build date options
   const dateOpts = allNav.map((r,i) => `<option value="${i}">${fmtDate(r.d)}</option>`).join('');
 
-  // Default: full range from slider
+  // Default: full range from slider, shifted back one month so the
+  // From date acts as the base and the window yields a full set of
+  // monthly observations (e.g. 3Y -> 36 returns, not 35)
   const total = allNav.length;
-  const iFrom = Math.round(state.rangeMin * (total - 1));
+  const iFrom = Math.max(0, Math.round(state.rangeMin * (total - 1)) - 1);
   const iTo = Math.round(state.rangeMax * (total - 1));
 
   el.innerHTML = `
