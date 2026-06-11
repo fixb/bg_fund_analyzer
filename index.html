@@ -526,7 +526,7 @@ let charts = {};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 
 // ============= APP STATE =============
-let state = {tab: 'nav', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'nl_strat', corrWindow: '3y', corrView: 'sub_strategy'};
+let state = {tab: 'nav', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfKpiPeriod: 'YTD', corrWindow: '3y', corrView: 'sub_strategy'};
 
 // Date filtering
 function getAllDates(tabKey) {
@@ -1010,8 +1010,8 @@ function renderNav(el){
 function renderPerf(el){
   const d = getFilteredData(RAW.perf);
   const last = d[d.length-1];
-  const view = state.perfView || 'nl_strat';
-  const kpiPeriod = state.perfKpiPeriod || '1M';
+  const view = state.perfView || 'main_strategy';
+  const kpiPeriod = state.perfKpiPeriod || 'YTD';
 
   // Slice the filtered data for the KPI banner based on selected period
   function getKpiSlice(arr, period) {
@@ -1120,7 +1120,8 @@ function renderPerf(el){
         const v = sumGrp(kpiSlice, g);
         const c = v >= 0 ? 'color:var(--green)' : v < 0 ? 'color:var(--red)' : '';
         const pad = V.groups.length > 6 ? 'padding:12px 14px;' : '';
-        return `<div class="kpi" style="${pad}"><div class="label">${g.label}</div><div class="value" style="${c}">${v.toFixed(1)} bps</div></div>`;
+        const pct = Math.abs(kpiTotal) > 0.5 ? (v / kpiTotal * 100).toFixed(0) + '% of total' : '—';
+        return `<div class="kpi" style="${pad}"><div class="label">${g.label}</div><div class="value" style="${c}">${v.toFixed(1)} bps</div><div class="change" style="color:var(--text3)">${pct}</div></div>`;
       }).join('')}
     </div>
     <div class="charts-grid">
@@ -1129,6 +1130,7 @@ function renderPerf(el){
       <div class="chart-card"><div class="chart-header"><h3>Cumulative Contribution (bps)</h3>${chartExportBtns("perfCum","bg_attrib_cumul_"+view)}</div><div class="desc">Running sum since period start</div><div class="chart-wrap"><canvas id="perfCumChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Total Monthly P&L (bps)</h3>${chartExportBtns("perfTotal","bg_monthly_pnl")}</div><div class="desc">Net monthly performance</div><div class="chart-wrap"><canvas id="perfTotalChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Contribution Pie (Period Total)</h3>${chartExportBtns("perfPie","bg_attrib_pie_"+view)}</div><div class="desc">Share of total P&L over selected period</div><div class="chart-wrap"><canvas id="perfPieChart"></canvas></div></div>
+      <div class="chart-card full"><div class="chart-header"><h3>Event Driven — Contribution to Overall</h3>${chartExportBtns("perfEd","bg_event_driven_contribution")}</div><div class="desc">Monthly Event Driven P&L (bars, left) and cumulative ED share of total fund P&L (line, right — shown from month 12)</div><div class="chart-wrap"><canvas id="perfEdChart"></canvas></div></div>
     </div>
     <div class="table-header"><div class="section-title">Monthly Attribution — ${V.label}</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
     <div class="table-wrap"><table id="perfTable"></table></div>
@@ -1203,6 +1205,31 @@ function renderPerf(el){
     options:{responsive:true,maintainAspectRatio:false,plugins:{
       legend:{position:'right',labels:{font:{size:10}}},
       tooltip:{callbacks:{label:function(ctx){const v=pieTotals[ctx.dataIndex];return ctx.label+': '+(v>=0?'+':'')+v.toFixed(0)+' bps';}}}
+    }}
+  });
+
+  // ====== EVENT DRIVEN vs OVERALL ======
+  // ED defined as the Pitch Framework group (ra, ls, cl, ca, cx), independent of selected grouping
+  const edSubs = ['ra','ls','cl','ca','cx'];
+  const edMonthly = d.map(r => edSubs.reduce((s,k) => s + (r[k]||0), 0));
+  let cumEd = 0, cumTot = 0;
+  // Share only shown once 12 months have accrued and the cumulative total is meaningful
+  const edShare = d.map((r,i) => {
+    cumEd += edMonthly[i]; cumTot += r.t||0;
+    return (i >= 11 && Math.abs(cumTot) > 50) ? cumEd / cumTot * 100 : null;
+  });
+  charts.perfEd = new Chart(document.getElementById('perfEdChart'),{
+    data:{
+      labels:d.map(r=>fmtDate(r.d)),
+      datasets:[
+        {type:'bar', label:'Event Driven monthly (bps)', data:edMonthly, backgroundColor:'#10b981b3', yAxisID:'y', order:2},
+        {type:'line', label:'ED share of cumulative total (%)', data:edShare, borderColor:'#f59e0b', borderWidth:2, pointRadius:0, yAxisID:'y1', order:1}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{
+      x:{ticks:{maxTicksLimit:12}},
+      y:{title:{display:true,text:'bps'}},
+      y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'% of total'}}
     }}
   });
 
