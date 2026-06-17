@@ -526,7 +526,7 @@ let charts = {};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 
 // ============= APP STATE =============
-let state = {tab: 'nav', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfKpiPeriod: 'YTD', corrWindow: '3y', corrView: 'sub_strategy'};
+let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfKpiPeriod: 'YTD', corrWindow: '3y', corrView: 'sub_strategy'};
 
 // Date filtering
 function getAllDates(tabKey) {
@@ -843,7 +843,7 @@ function render(){
       </div>
     </div>
     <div class="tabs">
-      ${['nav','perf','exposure','ear','greeks','leverage','cash','ifrs','analytics','corrbeta','perfstats'].map(t=>
+      ${['analytics','perfstats','nav','perf','exposure','ear','greeks','leverage','cash','ifrs','corrbeta'].map(t=>
         `<div class="tab ${state.tab===t?'active':''}" onclick="state.tab='${t}';render()">${{
           nav:'📈 NAV & Performance',perf:'🎯 Attribution',exposure:'📊 Exposure',
           ear:'⚡ Equity at Risk',greeks:'Ω Greeks',leverage:'🔧 Leverage',
