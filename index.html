@@ -29,6 +29,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);ove
 .import-btn{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;display:flex;align-items:center;gap:6px}
 .import-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(59,130,246,.3)}
 .import-btn svg{width:16px;height:16px}
+.link-btn{background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;display:flex;align-items:center;gap:6px;text-decoration:none}
+.link-btn:hover{transform:translateY(-1px);color:var(--text);border-color:var(--text3)}
+.link-btn svg{width:16px;height:16px}
 .dropzone-overlay{display:none;position:fixed;inset:0;z-index:1000;background:rgba(10,14,23,.92);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;gap:16px}
 .dropzone-overlay.visible{display:flex}
 .dropzone-box{border:2px dashed var(--accent);border-radius:16px;padding:60px 80px;text-align:center;transition:all .2s}
@@ -836,6 +839,10 @@ function render(){
       </div>
       <div class="header-right">
         <div class="date-range">${RAW.nav.length} months of data</div>
+        <a class="link-btn" href="https://fixb.github.io/corporate_activity/market-review.html" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          M&A Review
+        </a>
         <button class="import-btn" onclick="openDropzone()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Import New File
