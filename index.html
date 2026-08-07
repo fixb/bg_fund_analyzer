@@ -1141,8 +1141,6 @@ function renderPerf(el){
     </div>
     <div class="table-header"><div class="section-title">Monthly Attribution — ${V.label}</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
     <div class="table-wrap"><table id="perfTable"></table></div>
-    <div class="section-title" style="margin-top:24px">Strategy Mapping Reference</div>
-    <div class="table-wrap"><table id="transcoTable"></table></div>
     ${renderGlossary('perf')}
   `;
 
@@ -1258,25 +1256,6 @@ function renderPerf(el){
   tHTML += '</tbody>';
   document.getElementById('perfTable').innerHTML = tHTML;
 
-  // ====== TRANSCO REFERENCE TABLE ======
-  const transco = [
-    ['Mandatory CB Arb (mc)','Volatility','Long Vol','Protection — Volatility'],
-    ['CB Arbitrage (cb)','Volatility','Long Vol','Protection — Volatility'],
-    ['Vol Trading (vt)','Volatility','Overlay Vol','Protection — Volatility'],
-    ['Warrant/Gamma Arb (wa)','Volatility','Long Vol','Protection — Volatility'],
-    ['Risk Arb / Spec Sit (ra)','Equity','Event-Driven','Event Driven'],
-    ['Long/Short Equity (ls)','Equity','Event-Driven','Event Driven'],
-    ['Credit L/S (cl)','Credit','Event-Driven','Event Driven'],
-    ['Cap Struct Arb (ca)','Credit','Event-Driven','Event Driven'],
-    ['Credit Special Sit (cx)','Credit','Event-Driven','Event Driven'],
-    ['Trading (ts)','Trading','Mixed*','Mixed*'],
-  ];
-  let trHTML = '<thead><tr><th>Perf Column</th><th>Asset Class</th><th>Strat Bucket</th><th>Main Strategy</th></tr></thead><tbody>';
-  transco.forEach(r => {
-    trHTML += `<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`;
-  });
-  trHTML += '</tbody><tfoot><tr><td colspan="4" style="font-size:10px;color:var(--text3);padding:10px">* Trading subtotal aggregates Event-Driven trading, Overlay Macro, Overlay EQT, Index Arb, and CTA — cannot be split from historical data</td></tr></tfoot>';
-  document.getElementById('transcoTable').innerHTML = trHTML;
 }
 
 // ============= EXPOSURE =============
