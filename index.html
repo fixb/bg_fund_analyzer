@@ -858,7 +858,7 @@ function render(){
         }[t]}</div>`
       ).join('')}
     </div>
-    <div class="date-slider-wrap">
+    ${state.tab === 'analytics' ? '' : `<div class="date-slider-wrap">
       <div class="slider-label">Date Range</div>
       <div class="slider-dates"><span id="labelMin"></span><span style="color:var(--text3)">—</span><span id="labelMax"></span></div>
       <div class="range-track">
@@ -875,7 +875,7 @@ function render(){
         <button data-preset="10y" onclick="applyPreset('10y')">10Y</button>
         <button data-preset="all" onclick="applyPreset('all')">All</button>
       </div>
-    </div>
+    </div>`}
     <div id="content"></div>
   `;
   setTimeout(updateSliderUI, 0);
