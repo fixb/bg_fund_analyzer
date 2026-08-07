@@ -529,7 +529,7 @@ let charts = {};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 
 // ============= APP STATE =============
-let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfKpiPeriod: 'YTD', corrWindow: '3y', corrView: 'sub_strategy'};
+let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfRollWin: '12M', corrWindow: '3y', corrView: 'sub_strategy'};
 
 // Date filtering
 function getAllDates(tabKey) {
@@ -1018,24 +1018,21 @@ function renderPerf(el){
   const d = getFilteredData(RAW.perf);
   const last = d[d.length-1];
   const view = state.perfView || 'main_strategy';
-  const kpiPeriod = state.perfKpiPeriod || 'YTD';
+  const rollWin = state.perfRollWin || '12M';
+  const rollN = {'1M':1, '3M':3, '6M':6, '12M':12}[rollWin] || 12;
 
-  // Slice the filtered data for the KPI banner based on selected period
-  function getKpiSlice(arr, period) {
+  // Trailing rolling window (in months): drives both the KPI banner and the
+  // driver-mix chart's share calculation. The slider handles the historical
+  // series window; this dropdown is purely the look-back length.
+  function getKpiSlice(arr, n) {
     if (!arr || !arr.length) return arr || [];
-    if (period === 'ALL') return arr;
-    if (period === 'YTD') {
-      const year = arr[arr.length-1].d.slice(0,4);
-      const idx = arr.findIndex(r => r.d.slice(0,4) === year);
-      return idx >= 0 ? arr.slice(idx) : arr;
-    }
-    const n = {'1M':1, '3M':3, '6M':6, '12M':12}[period] || 1;
     return arr.slice(-Math.min(n, arr.length));
   }
-  const kpiSlice = getKpiSlice(d, kpiPeriod);
+  const kpiSlice = getKpiSlice(d, rollN);
   const kpiFrom = kpiSlice[0];
   const kpiTo = kpiSlice[kpiSlice.length-1];
-  const periodLabels = {'1M':'Last Month','3M':'Last 3M','6M':'Last 6M','YTD':'YTD','12M':'Last 12M','ALL':'Selected Range'};
+  const periodLabels = {'1M':'Last Month','3M':'Last 3M','6M':'Last 6M','12M':'Last 1Yr'};
+  const rollLabels = {'1M':'1M','3M':'3M','6M':'6M','12M':'1Yr'};
   const periodRangeStr = kpiSlice.length > 1
     ? fmtDate(kpiFrom.d) + ' → ' + fmtDate(kpiTo.d)
     : fmtDate(kpiTo.d);
@@ -1107,7 +1104,7 @@ function renderPerf(el){
   }
   const kpiTotal = kpiSlice.reduce((s, r) => s + (r.t || 0), 0);
 
-  const KPI_PERIODS = ['1M','3M','6M','YTD','12M','ALL'];
+  const ROLL_WINDOWS = ['1M','3M','6M','12M'];
 
   el.innerHTML = `
     <div class="controls" style="gap:14px;align-items:center;flex-wrap:wrap">
@@ -1115,14 +1112,14 @@ function renderPerf(el){
       <select id="perfViewSel" onchange="state.perfView=this.value;renderPerf(document.getElementById('content'))">
         ${Object.entries(VIEWS).map(([k,v]) => `<option value="${k}" ${k===view?'selected':''}>${v.label}</option>`).join('')}
       </select>
-      <label style="font-size:12px;color:var(--text2);margin-left:18px">KPI Period</label>
-      <select id="perfKpiPeriodSel" onchange="state.perfKpiPeriod=this.value;renderPerf(document.getElementById('content'))">
-        ${KPI_PERIODS.map(k => `<option value="${k}" ${k===kpiPeriod?'selected':''}>${periodLabels[k]}</option>`).join('')}
+      <label style="font-size:12px;color:var(--text2);margin-left:18px">Rolling Window</label>
+      <select id="perfRollWinSel" onchange="state.perfRollWin=this.value;renderPerf(document.getElementById('content'))">
+        ${ROLL_WINDOWS.map(k => `<option value="${k}" ${k===rollWin?'selected':''}>${rollLabels[k]}</option>`).join('')}
       </select>
       <span style="font-size:11px;color:var(--text2)">${periodRangeStr}</span>
     </div>
     <div class="kpi-row" style="margin-bottom:8px;${V.groups.length > 6 ? 'grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px' : ''}">
-      <div class="kpi" style="${V.groups.length > 6 ? 'padding:12px 14px' : ''}"><div class="label">Total — ${periodLabels[kpiPeriod]}</div><div class="value ${colorVal(kpiTotal)}">${kpiTotal.toFixed(1)} bps</div></div>
+      <div class="kpi" style="${V.groups.length > 6 ? 'padding:12px 14px' : ''}"><div class="label">Total — ${periodLabels[rollWin]}</div><div class="value ${colorVal(kpiTotal)}">${kpiTotal.toFixed(1)} bps</div></div>
       ${V.groups.map(g => {
         const v = sumGrp(kpiSlice, g);
         const c = v >= 0 ? 'color:var(--green)' : v < 0 ? 'color:var(--red)' : '';
@@ -1132,30 +1129,61 @@ function renderPerf(el){
       }).join('')}
     </div>
     <div class="charts-grid">
-      <div class="chart-card full tall"><div class="chart-header"><h3>${V.label} — Monthly Attribution (bps)</h3>${chartExportBtns("perfStack","bg_attrib_"+view)}</div><div class="desc">Stacked bar decomposition</div><div class="chart-wrap"><canvas id="perfStackChart"></canvas></div></div>
+      <div class="chart-card full tall"><div class="chart-header"><h3>${V.label} — ${rollWin==='1M'?'Monthly':'Rolling '+rollLabels[rollWin]} Attribution (bps)</h3>${chartExportBtns("perfStack","bg_attrib_"+view)}</div><div class="desc">${rollWin==='1M'?'Single-month P&L by group (stacked bps).':'Each bar = trailing-'+rollLabels[rollWin]+' P&L by group (stacked bps).'} Window set by the Rolling Window selector above.</div><div class="chart-wrap"><canvas id="perfStackChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Annual Attribution</h3>${chartExportBtns("perfAnn","bg_attrib_annual_"+view)}</div><div class="desc">Yearly total by group</div><div class="chart-wrap"><canvas id="perfAnnualChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Cumulative Contribution (bps)</h3>${chartExportBtns("perfCum","bg_attrib_cumul_"+view)}</div><div class="desc">Running sum since period start</div><div class="chart-wrap"><canvas id="perfCumChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Total Monthly P&L (bps)</h3>${chartExportBtns("perfTotal","bg_monthly_pnl")}</div><div class="desc">Net monthly performance</div><div class="chart-wrap"><canvas id="perfTotalChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Contribution Pie (Period Total)</h3>${chartExportBtns("perfPie","bg_attrib_pie_"+view)}</div><div class="desc">Share of total P&L over selected period</div><div class="chart-wrap"><canvas id="perfPieChart"></canvas></div></div>
-      <div class="chart-card full"><div class="chart-header"><h3>Performance Drivers — Event Driven vs Vol vs Quant</h3>${chartExportBtns("perfEd","bg_perf_driver_mix")}</div><div class="desc">Share of performance explained by each driver on a rolling 12-month window (100% stacked). Watch the Event Driven band widen or narrow versus Volatility and Quant over time. Shown from month 12.</div><div class="chart-wrap"><canvas id="perfEdChart"></canvas></div></div>
+      <div class="chart-card full"><div class="chart-header"><h3>Performance Drivers — Event Driven vs Vol vs Quant</h3>${chartExportBtns("perfEd","bg_perf_driver_mix")}</div><div class="desc">Share of performance explained by each driver on a rolling ${rollLabels[rollWin]} window (100% stacked). Watch the Event Driven band widen or narrow versus Volatility and Quant over time. Window set by the Rolling Window selector above.</div><div class="chart-wrap"><canvas id="perfEdChart"></canvas></div></div>
     </div>
     <div class="table-header"><div class="section-title">Monthly Attribution — ${V.label}</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
     <div class="table-wrap"><table id="perfTable"></table></div>
     ${renderGlossary('perf')}
   `;
 
-  // ====== STACKED BAR ======
+  // ====== ROLLING-WINDOW ATTRIBUTION (stacked bars, bps) ======
+  // Each bar is the trailing rolling-window P&L per group in bps (absolute).
+  // At a 1M window this is the classic single-month attribution; longer windows
+  // sum the trailing months. Computed from the full filtered series so early
+  // display bars still get a full window; incomplete leading bars are trimmed.
   const sliceN = Math.min(d.length, 120);
   const dSlice = d.slice(-sliceN);
+  const stackStartIdx = d.length - sliceN;
+  const stackLabels = [];
+  const stackBps = V.groups.map(() => []);
+  for (let i = stackStartIdx; i < d.length; i++) {
+    stackLabels.push(fmtDate(d[i].d));
+    if (i < rollN - 1) { stackBps.forEach(a => a.push(null)); continue; }
+    const win = d.slice(i - rollN + 1, i + 1);
+    V.groups.forEach((g,gi) => stackBps[gi].push(win.reduce((s,r) => s + grpVal(r,g), 0)));
+  }
+  // Trim the leading empty span so the bars start where data actually begins
+  const stackFirst = stackBps[0].findIndex(v => v != null);
+  const stkLabels = stackFirst >= 0 ? stackLabels.slice(stackFirst) : [];
+  const stkBps = stackBps.map(a => stackFirst >= 0 ? a.slice(stackFirst) : []);
   charts.perfStack = new Chart(document.getElementById('perfStackChart'),{
     type:'bar',
     data:{
-      labels:dSlice.map(r=>fmtDate(r.d)),
-      datasets:V.groups.map(g => ({
-        label:g.label, data:dSlice.map(r=>grpVal(r,g)), backgroundColor:g.color+'b3', stack:'s'
+      labels:stkLabels,
+      datasets:V.groups.map((g,gi) => ({
+        label:g.label, data:stkBps[gi], backgroundColor:g.color+'cc', stack:'s'
       }))
     },
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,ticks:{maxTicksLimit:12}},y:{stacked:true,title:{display:true,text:'bps'}}}}
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},
+        tooltip:{mode:'index',callbacks:{
+          title:items => (rollN > 1 ? 'Trailing '+rollLabels[rollWin]+' to ' : '')+items[0].label,
+          label:ctx => {
+            const bps = ctx.parsed.y;
+            if (bps == null) return null;
+            return ctx.dataset.label+': '+(bps>=0?'+':'')+Math.round(bps)+' bps';
+          },
+          footer:items => {
+            const tot = items.reduce((s,it) => s + (it.parsed.y||0), 0);
+            return 'Total P&L: '+(tot>=0?'+':'')+Math.round(tot)+' bps';
+          }
+        }}},
+      scales:{x:{stacked:true,ticks:{maxTicksLimit:12}},y:{stacked:true,title:{display:true,text:'bps'}}}}
   });
 
   // ====== ANNUAL ======
@@ -1215,24 +1243,32 @@ function renderPerf(el){
 
   // ====== PERFORMANCE DRIVER MIX (rolling 12M share) ======
   // Three Pitch-Framework buckets that partition fund P&L, independent of the
-  // selected grouping. Each month we take the trailing-12M P&L per bucket and
-  // express it as a share of the trailing-12M P&L of the three combined, so the
-  // shares always sum to 100% and the ED band's evolution is directly readable.
+  // selected grouping. At each month we take the trailing rolling-window P&L
+  // per bucket (window length from the Rolling Window selector) and express it
+  // as a share of the three combined, so the shares sum to 100% and the ED
+  // band's evolution is directly readable.
   const driverBuckets = [
     {label:'Volatility',    color:'#3b82f6', subs:['mc','cb','vt','wa']},
     {label:'Event Driven',  color:'#10b981', subs:['ra','ls','cl','ca','cx']},
     {label:'Quant Trading', color:'#a78bfa', subs:['ts']},
   ];
-  const EDWIN = 12;
+  const EDWIN = rollN;
+  // Shorter windows have smaller totals; scale the near-zero guard so a tiny
+  // window total doesn't blow the shares up (matches the old 30 bps at 12M).
+  const edMinDenom = Math.max(5, rollN * 2.5);
   const edLabelsAll = d.map(r => fmtDate(r.d));
   const driverSharesAll = driverBuckets.map(() => []);
-  const driverBpsAll = driverBuckets.map(() => []); // trailing-12M P&L per bucket (bps)
+  const driverBpsAll = driverBuckets.map(() => []); // trailing-window P&L per bucket (bps)
+  const pushNull = () => { driverSharesAll.forEach(a => a.push(null)); driverBpsAll.forEach(a => a.push(null)); };
   for (let i = 0; i < d.length; i++) {
-    if (i < EDWIN - 1) { driverSharesAll.forEach(a => a.push(null)); driverBpsAll.forEach(a => a.push(null)); continue; }
+    if (i < EDWIN - 1) { pushNull(); continue; }
     const win = d.slice(i - EDWIN + 1, i + 1);
     const bsum = driverBuckets.map(b => win.reduce((s,r) => s + b.subs.reduce((ss,k) => ss + (r[k]||0), 0), 0));
     const denom = bsum.reduce((a,b) => a + b, 0);
-    if (Math.abs(denom) < 30) { driverSharesAll.forEach(a => a.push(null)); driverBpsAll.forEach(a => a.push(null)); continue; }
+    const grossAbs = bsum.reduce((a,b) => a + Math.abs(b), 0);
+    // Skip "wash" windows where large offsetting drivers net near zero: dividing
+    // by that tiny net would explode the shares into meaningless spikes.
+    if (Math.abs(denom) < edMinDenom || Math.abs(denom) < 0.4 * grossAbs) { pushNull(); continue; }
     driverBuckets.forEach((b,bi) => { driverSharesAll[bi].push(bsum[bi] / denom * 100); driverBpsAll[bi].push(bsum[bi]); });
   }
   // Trim the leading empty span so the series starts where data actually begins
@@ -1240,6 +1276,17 @@ function renderPerf(el){
   const edLabels = edStart >= 0 ? edLabelsAll.slice(edStart) : [];
   const driverShares = driverSharesAll.map(a => edStart >= 0 ? a.slice(edStart) : []);
   const driverBps = driverBpsAll.map(a => edStart >= 0 ? a.slice(edStart) : []);
+  // Y-axis stays framed at 0–100% when every driver is a positive contributor;
+  // for short windows a detractor can push a share below 0 or above 100, so
+  // expand the axis to whatever the stacked bands actually need.
+  let edMaxPos = 100, edMinNeg = 0;
+  for (let j = 0; j < edLabels.length; j++) {
+    let pos = 0, neg = 0;
+    driverShares.forEach(a => { const v = a[j]; if (v == null) return; if (v >= 0) pos += v; else neg += v; });
+    edMaxPos = Math.max(edMaxPos, pos); edMinNeg = Math.min(edMinNeg, neg);
+  }
+  const edYMax = Math.ceil((edMaxPos - 0.01) / 10) * 10;
+  const edYMin = Math.floor((edMinNeg + 0.01) / 10) * 10;
   charts.perfEd = new Chart(document.getElementById('perfEdChart'),{
     type:'line',
     data:{
@@ -1253,7 +1300,7 @@ function renderPerf(el){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},
         tooltip:{mode:'index',callbacks:{
-          title:items => 'Trailing 12M to '+items[0].label,
+          title:items => 'Trailing '+rollLabels[rollWin]+' to '+items[0].label,
           label:ctx => {
             const bps = driverBps[ctx.datasetIndex][ctx.dataIndex];
             const share = ctx.parsed.y;
@@ -1267,7 +1314,7 @@ function renderPerf(el){
         }}},
       scales:{
         x:{ticks:{maxTicksLimit:12}},
-        y:{stacked:true,min:0,max:100,title:{display:true,text:'% of trailing-12M P&L'},ticks:{callback:v=>v+'%'}}
+        y:{stacked:true,min:edYMin,max:edYMax,title:{display:true,text:'% of trailing-'+rollLabels[rollWin]+' P&L'},ticks:{callback:v=>v+'%'}}
       }}
   });
 
