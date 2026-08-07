@@ -1137,7 +1137,7 @@ function renderPerf(el){
       <div class="chart-card"><div class="chart-header"><h3>Cumulative Contribution (bps)</h3>${chartExportBtns("perfCum","bg_attrib_cumul_"+view)}</div><div class="desc">Running sum since period start</div><div class="chart-wrap"><canvas id="perfCumChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Total Monthly P&L (bps)</h3>${chartExportBtns("perfTotal","bg_monthly_pnl")}</div><div class="desc">Net monthly performance</div><div class="chart-wrap"><canvas id="perfTotalChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Contribution Pie (Period Total)</h3>${chartExportBtns("perfPie","bg_attrib_pie_"+view)}</div><div class="desc">Share of total P&L over selected period</div><div class="chart-wrap"><canvas id="perfPieChart"></canvas></div></div>
-      <div class="chart-card full"><div class="chart-header"><h3>Event Driven — Contribution to Overall</h3>${chartExportBtns("perfEd","bg_event_driven_contribution")}</div><div class="desc">Monthly Event Driven P&L (bars, left) and cumulative ED share of total fund P&L (line, right — shown from month 12)</div><div class="chart-wrap"><canvas id="perfEdChart"></canvas></div></div>
+      <div class="chart-card full"><div class="chart-header"><h3>Performance Drivers — Event Driven vs Vol vs Quant</h3>${chartExportBtns("perfEd","bg_perf_driver_mix")}</div><div class="desc">Share of performance explained by each driver on a rolling 12-month window (100% stacked). Watch the Event Driven band widen or narrow versus Volatility and Quant over time. Shown from month 12.</div><div class="chart-wrap"><canvas id="perfEdChart"></canvas></div></div>
     </div>
     <div class="table-header"><div class="section-title">Monthly Attribution — ${V.label}</div><button class="export-btn" onclick="exportAllTabCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>
     <div class="table-wrap"><table id="perfTable"></table></div>
@@ -1213,29 +1213,62 @@ function renderPerf(el){
     }}
   });
 
-  // ====== EVENT DRIVEN vs OVERALL ======
-  // ED defined as the Pitch Framework group (ra, ls, cl, ca, cx), independent of selected grouping
-  const edSubs = ['ra','ls','cl','ca','cx'];
-  const edMonthly = d.map(r => edSubs.reduce((s,k) => s + (r[k]||0), 0));
-  let cumEd = 0, cumTot = 0;
-  // Share only shown once 12 months have accrued and the cumulative total is meaningful
-  const edShare = d.map((r,i) => {
-    cumEd += edMonthly[i]; cumTot += r.t||0;
-    return (i >= 11 && Math.abs(cumTot) > 50) ? cumEd / cumTot * 100 : null;
-  });
+  // ====== PERFORMANCE DRIVER MIX (rolling 12M share) ======
+  // Three Pitch-Framework buckets that partition fund P&L, independent of the
+  // selected grouping. Each month we take the trailing-12M P&L per bucket and
+  // express it as a share of the trailing-12M P&L of the three combined, so the
+  // shares always sum to 100% and the ED band's evolution is directly readable.
+  const driverBuckets = [
+    {label:'Volatility',    color:'#3b82f6', subs:['mc','cb','vt','wa']},
+    {label:'Event Driven',  color:'#10b981', subs:['ra','ls','cl','ca','cx']},
+    {label:'Quant Trading', color:'#a78bfa', subs:['ts']},
+  ];
+  const EDWIN = 12;
+  const edLabelsAll = d.map(r => fmtDate(r.d));
+  const driverSharesAll = driverBuckets.map(() => []);
+  const driverBpsAll = driverBuckets.map(() => []); // trailing-12M P&L per bucket (bps)
+  for (let i = 0; i < d.length; i++) {
+    if (i < EDWIN - 1) { driverSharesAll.forEach(a => a.push(null)); driverBpsAll.forEach(a => a.push(null)); continue; }
+    const win = d.slice(i - EDWIN + 1, i + 1);
+    const bsum = driverBuckets.map(b => win.reduce((s,r) => s + b.subs.reduce((ss,k) => ss + (r[k]||0), 0), 0));
+    const denom = bsum.reduce((a,b) => a + b, 0);
+    if (Math.abs(denom) < 30) { driverSharesAll.forEach(a => a.push(null)); driverBpsAll.forEach(a => a.push(null)); continue; }
+    driverBuckets.forEach((b,bi) => { driverSharesAll[bi].push(bsum[bi] / denom * 100); driverBpsAll[bi].push(bsum[bi]); });
+  }
+  // Trim the leading empty span so the series starts where data actually begins
+  const edStart = driverSharesAll[0].findIndex(v => v != null);
+  const edLabels = edStart >= 0 ? edLabelsAll.slice(edStart) : [];
+  const driverShares = driverSharesAll.map(a => edStart >= 0 ? a.slice(edStart) : []);
+  const driverBps = driverBpsAll.map(a => edStart >= 0 ? a.slice(edStart) : []);
   charts.perfEd = new Chart(document.getElementById('perfEdChart'),{
+    type:'line',
     data:{
-      labels:d.map(r=>fmtDate(r.d)),
-      datasets:[
-        {type:'bar', label:'Event Driven monthly (bps)', data:edMonthly, backgroundColor:'#10b981b3', yAxisID:'y', order:2},
-        {type:'line', label:'ED share of cumulative total (%)', data:edShare, borderColor:'#f59e0b', borderWidth:2, pointRadius:0, yAxisID:'y1', order:1}
-      ]
+      labels:edLabels,
+      datasets:driverBuckets.map((b,bi) => ({
+        label:b.label, data:driverShares[bi],
+        borderColor:b.color, backgroundColor:b.color+'66', borderWidth:1.5,
+        pointRadius:0, tension:.25, fill:bi===0?'origin':'-1'
+      }))
     },
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{
-      x:{ticks:{maxTicksLimit:12}},
-      y:{title:{display:true,text:'bps'}},
-      y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'% of total'}}
-    }}
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},
+        tooltip:{mode:'index',callbacks:{
+          title:items => 'Trailing 12M to '+items[0].label,
+          label:ctx => {
+            const bps = driverBps[ctx.datasetIndex][ctx.dataIndex];
+            const share = ctx.parsed.y;
+            if (share == null || bps == null) return ctx.dataset.label+': —';
+            return ctx.dataset.label+': '+share.toFixed(0)+'%  ('+(bps>=0?'+':'')+Math.round(bps)+' bps)';
+          },
+          footer:items => {
+            const tot = items.reduce((s,it) => s + (driverBps[it.datasetIndex][it.dataIndex]||0), 0);
+            return 'Total P&L: '+(tot>=0?'+':'')+Math.round(tot)+' bps';
+          }
+        }}},
+      scales:{
+        x:{ticks:{maxTicksLimit:12}},
+        y:{stacked:true,min:0,max:100,title:{display:true,text:'% of trailing-12M P&L'},ticks:{callback:v=>v+'%'}}
+      }}
   });
 
   // ====== TABLE ======
