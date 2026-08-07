@@ -1801,16 +1801,19 @@ function computeAnalytics() {
   const minR = Math.floor(worstMonth / binSize) * binSize;
   const maxR = Math.ceil(bestMonth / binSize) * binSize;
   const bins = [];
-  for (let b = minR; b <= maxR + binSize/2; b += binSize) bins.push({lo:b, hi:b+binSize, count:0, label:(b*100).toFixed(1)+'%'});
-  mtdReturns.forEach(r => {
+  for (let b = minR; b <= maxR + binSize/2; b += binSize) bins.push({lo:b, hi:b+binSize, count:0, months:[], label:(b*100).toFixed(1)+'%'});
+  mtdReturns.forEach((r, i) => {
     const idx = Math.max(0, Math.min(bins.length-1, Math.floor((r - minR) / binSize)));
     bins[idx].count++;
+    bins[idx].months.push({d:mtdDates[i], r});
   });
+  // list months per bin most-recent first
+  bins.forEach(b => b.months.sort((a,c) => new Date(c.d) - new Date(a.d)));
 
   charts['analyticsHist'] = new Chart(document.getElementById('analyticsHistCanvas'), {
     type:'bar',
     data:{labels:bins.map(b=>b.label), datasets:[{label:'Months',data:bins.map(b=>b.count),backgroundColor:bins.map(b=>b.lo>=0?'rgba(16,185,129,.7)':'rgba(239,68,68,.7)'),borderRadius:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'Monthly Return (from Base 100)'}},y:{title:{display:true,text:'Count'},ticks:{stepSize:1}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{afterBody:items=>{const b=bins[items[0].dataIndex];return b.months.map(m=>fmtDate(m.d)+'  '+(m.r>=0?'+':'')+(m.r*100).toFixed(2)+'%');}}}},scales:{x:{title:{display:true,text:'Monthly Return (from Base 100)'}},y:{title:{display:true,text:'Count'},ticks:{stepSize:1}}}}
   });
 }
 
