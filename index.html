@@ -1948,11 +1948,7 @@ function renderVsCash(el) {
       <select onchange="state.currency=this.value;render()">
         ${['usd','eur'].map(c=>`<option value="${c}" ${c===ccy?'selected':''}>${c.toUpperCase()} vs ${CASH_LABEL[c]}</option>`).join('')}
       </select>
-      <label style="font-size:12px;color:var(--text2)">Rolling window</label>
-      <div class="slider-presets">
-        ${Object.entries(VC_WINDOWS).map(([k,l]) => `<button class="${+k===win?'active':''}" onclick="state.vcRollWin=${k};renderVsCash(document.getElementById('content'))">${l}</button>`).join('')}
-      </div>
-      <span style="font-size:12px;color:var(--text3)">${fmtDate(d[0].d)} → ${fmtDate(last.d)} · ${n} months (${years.toFixed(1)} years)</span>
+      <span style="font-size:12px;color:var(--text3)">Period (date range above): ${fmtDate(d[0].d)} → ${fmtDate(last.d)} · ${n} months (${years.toFixed(1)} years)</span>
     </div>
     <div class="kpi-row">
       <div class="kpi"><div class="label">Fund Ann. Return</div><div class="value ${colorVal(fAnn)}">${pct(fAnn)}</div><div class="change">Cum. ${pct(fCum,1)}</div></div>
@@ -1964,7 +1960,7 @@ function renderVsCash(el) {
     </div>
     <div class="charts-grid">
       <div class="chart-card full"><div class="chart-header"><h3>${ccy.toUpperCase()} Fund vs ${CL} — Rebased to 100</h3>${chartExportBtns("vcCum","bg_vs_cash_cumulative_"+ccy)}</div><div class="desc">Cumulative performance of the fund vs cash compounded at the 3M rate; shaded area = cumulative excess</div><div class="chart-wrap"><canvas id="vcCumChart"></canvas></div></div>
-      <div class="chart-card full tall"><div class="chart-header"><h3>Rolling ${VC_WINDOWS[win]} Return Spread over ${CL}</h3>${chartExportBtns("vcSpread","bg_vs_cash_spread12m_"+ccy)}</div><div class="desc">Trailing ${WL} fund return − trailing ${WL} cash return (bars) · ${WL} fund and cash returns (lines)${win > 12 ? ' · annualized' : ''}</div><div class="chart-wrap"><canvas id="vcSpreadChart"></canvas></div></div>
+      <div class="chart-card full tall"><div class="chart-header"><h3>Rolling ${VC_WINDOWS[win]} Return Spread over ${CL}</h3><div style="display:flex;gap:8px;align-items:center"><label style="font-size:11px;color:var(--text3)">Window</label><select onchange="state.vcRollWin=+this.value;destroyCharts();renderVsCash(document.getElementById('content'))">${Object.entries(VC_WINDOWS).map(([k,l]) => `<option value="${k}" ${+k===win?'selected':''}>${l}</option>`).join('')}</select>${chartExportBtns("vcSpread","bg_vs_cash_spread_"+VC_WINDOWS[win]+"_"+ccy)}</div></div><div class="desc">Trailing ${WL} fund return − trailing ${WL} cash return (bars) · ${WL} fund and cash returns (lines)${win > 12 ? ' · annualized' : ''}</div><div class="chart-wrap"><canvas id="vcSpreadChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Calendar-Year Returns vs Cash</h3>${chartExportBtns("vcAnn","bg_vs_cash_annual_"+ccy)}</div><div class="desc">Compounded within the selected range (partial years marked *)</div><div class="chart-wrap"><canvas id="vcAnnChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>${CL} Rate</h3>${chartExportBtns("vcRate","bg_cash3m_rate_"+ccy)}</div><div class="desc">Monthly average, % p.a.</div><div class="chart-wrap"><canvas id="vcRateChart"></canvas></div></div>
     </div>
