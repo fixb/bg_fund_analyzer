@@ -783,8 +783,8 @@ const GLOSSARY = {
       ['Annualized Return', 'Cumulative return rescaled to a 1-year basis: (1 + cum)^(1/years) − 1.'],
       ['Realized Vol (Ann.)', 'Annualized standard deviation of monthly returns × √12.'],
       ['Sharpe Ratio', '(Annualized Return − Risk-Free Rate) / Annualized Vol. Measures excess return per unit of total risk. Risk-free rate = Cash 3M (USD LIBOR 3M / Euribor 3M) compounded over the selected months and annualized; falls back to 2% if rates do not cover the period.'],
-      ['Sortino Ratio', 'Like Sharpe but uses downside deviation (only negative monthly returns) in the denominator — penalizes losses, not upside volatility.'],
-      ['Calmar Ratio', 'Annualized Return / |Max Drawdown|. Higher = better return for the worst observed loss.'],
+      ['Sortino Ratio', '(Annualized Return − Cash 3M) / downside deviation. Downside deviation = √(mean over all months of min(0, monthly return − monthly cash return)²) × √12 — only shortfalls below cash count, upside is not penalized. Shown only with ≥ 3 months below cash.'],
+      ['Calmar Ratio', 'Annualized Return / |Max Drawdown|. Higher = better return for the worst observed loss. Shown only for periods of 3 years or more (standard definition), since short windows give tiny drawdowns and meaningless ratios.'],
       ['Max Drawdown', 'Largest peak-to-trough decline of the Base 100 index over the period. Peak, trough and recovery dates are reported.'],
       ['Recovery', 'Date at which the index first returned to the previous peak after the trough (or "Not recovered" if still below).'],
       ['% Positive Months', 'Share of months with a strictly positive return.'],
@@ -1791,10 +1791,14 @@ function computeAnalytics() {
   const rfLabel = rfMonths.length === months ? CASH_LABEL[ccy]+' '+(rfAnnual*100).toFixed(2)+'%' : '2%';
   let sharpe = (annVol > 0 && annReturn !== null) ? (annReturn - rfAnnual) / annVol : null;
 
-  const downReturns = mtdReturns.filter(r => r < 0);
-  const downVar = downReturns.length > 1 ? downReturns.reduce((a,r) => a + r*r, 0) / downReturns.length : 0;
-  const downDev = Math.sqrt(downVar) * Math.sqrt(12);
-  let sortino = (downDev > 0 && annReturn !== null) ? (annReturn - rfAnnual) / downDev : null;
+  // Downside deviation vs a cash target (monthly Cash 3M return), averaged over ALL months
+  const marM = mtdDates.map(d => { const v = cashRates[d.slice(0,7)]; return v != null ? v/100*parseInt(d.slice(8,10))/360 : rfAnnual/12; });
+  const shortfalls = mtdReturns.map((r,i) => Math.min(0, r - marM[i]));
+  const nBelow = shortfalls.filter(x => x < 0).length;
+  const downDev = Math.sqrt(shortfalls.reduce((a,x) => a + x*x, 0) / months) * Math.sqrt(12);
+  const SORTINO_MIN_BELOW = 3;
+  let sortino = (nBelow >= SORTINO_MIN_BELOW && downDev > 0 && annReturn !== null) ? (annReturn - rfAnnual) / downDev : null;
+  const sortinoNote = nBelow >= SORTINO_MIN_BELOW ? 'rf = '+rfLabel : 'only '+nBelow+' month'+(nBelow===1?'':'s')+' below cash'
 
   const bestMonth = Math.max(...mtdReturns);
   const worstMonth = Math.min(...mtdReturns);
@@ -1822,7 +1826,9 @@ function computeAnalytics() {
     if (ddRecovery === '\u2014') ddRecovery = 'Not recovered';
   }
 
-  let calmar = (maxDD < 0 && annReturn !== null) ? annReturn / Math.abs(maxDD) : null;
+  const CALMAR_MIN_MONTHS = 36;
+  let calmar = (months >= CALMAR_MIN_MONTHS && maxDD < 0 && annReturn !== null) ? annReturn / Math.abs(maxDD) : null;
+  const calmarNote = months >= CALMAR_MIN_MONTHS ? '' : 'needs \u2265 3Y of data';
 
   const base0 = b100Full[0][baseKey];
   const chartLabels = b100Full.map(r => fmtDate(r.d));
@@ -1844,8 +1850,8 @@ function computeAnalytics() {
       <div class="kpi"><div class="label">Annualized Return</div><div class="value ${colorVal(annReturn)}">${annReturn!=null?(annReturn*100).toFixed(2)+'%':'\u2014'}</div></div>
       <div class="kpi"><div class="label">Realized Vol (Ann.)</div><div class="value">${(annVol*100).toFixed(2)}%</div></div>
       <div class="kpi"><div class="label">Sharpe Ratio</div><div class="value">${sharpe!=null?sharpe.toFixed(2):'\u2014'}</div><div class="change">rf = ${rfLabel}</div></div>
-      <div class="kpi"><div class="label">Sortino Ratio</div><div class="value">${sortino!=null?sortino.toFixed(2):'\u2014'}</div><div class="change">rf = ${rfLabel}</div></div>
-      <div class="kpi"><div class="label">Calmar Ratio</div><div class="value">${calmar!=null?calmar.toFixed(2):'\u2014'}</div></div>
+      <div class="kpi"><div class="label">Sortino Ratio</div><div class="value">${sortino!=null?sortino.toFixed(2):'\u2014'}</div><div class="change">${sortinoNote}</div></div>
+      <div class="kpi"><div class="label">Calmar Ratio</div><div class="value">${calmar!=null?calmar.toFixed(2):'\u2014'}</div>${calmarNote?'<div class="change">'+calmarNote+'</div>':''}</div>
     </div>
     <div class="kpi-row">
       <div class="kpi"><div class="label">Max Drawdown</div><div class="value" style="color:var(--red)">${(maxDD*100).toFixed(2)}%</div>
