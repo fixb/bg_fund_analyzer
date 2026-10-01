@@ -531,7 +531,7 @@ let charts = {};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 
 // ============= APP STATE =============
-let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfRollWin: '12M', vcRollWin: 36, corrWindow: '3y', corrView: 'sub_strategy'};
+let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfRollWin: '12M', vcRollWin: 60, corrWindow: '3y', corrView: 'sub_strategy'};
 
 // Date filtering
 function getAllDates(tabKey) {
@@ -809,7 +809,7 @@ const GLOSSARY = {
       ['Cash 3M benchmark', 'USD share class: USD LIBOR 3M (OECD 3-month interbank rate, LIBOR\u2019s successor after its 2023 cessation). EUR share class: Euribor 3M. Monthly averages, % p.a.'],
       ['Monthly cash return', '3M rate of the month × actual days / 360 (money-market convention), compounded month by month.'],
       ['Spread over cash', 'Fund return minus cash return over the same period. Annualized spread = annualized fund return − annualized cash return.'],
-      ['Rolling spread', 'Trailing-window compounded fund return minus compounded cash return over the same window, at each month-end. Window selectable (1Y to 5Y, default 3Y); windows above 1Y are annualized.'],
+      ['Rolling spread', 'Trailing-window compounded fund return minus compounded cash return over the same window, at each month-end. Window selectable (1Y to 5Y, default 5Y); windows above 1Y are annualized.'],
       ['Excess Sharpe', 'Annualized mean of monthly (fund − cash) returns / annualized vol of those excess returns — a Sharpe ratio using the actual cash rate as risk-free.'],
       ['% Months > Cash', 'Share of months in which the fund return exceeded the monthly cash return.'],
       ['Data note', 'USD April 2020 is linearly interpolated (missing in source). Refresh rates with scripts/gen_cash3m.py.'],
@@ -1935,7 +1935,7 @@ function cashSeries(ccy, win) {
 function renderVsCash(el) {
   const ccy = state.currency;
   const CL = CASH_LABEL[ccy];
-  const win = VC_WINDOWS[state.vcRollWin] ? state.vcRollWin : 36;
+  const win = VC_WINDOWS[state.vcRollWin] ? state.vcRollWin : 60;
   const WL = VC_WINDOWS[win] + (win > 12 ? ' ann.' : '');
   const full = cashSeries(ccy, win);
   const dates = new Set(getFilteredData(RAW.nav).map(r => r.d));
