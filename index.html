@@ -531,7 +531,7 @@ let charts = {};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 
 // ============= APP STATE =============
-let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfRollWin: '12M', vcRollWin: 12, corrWindow: '3y', corrView: 'sub_strategy'};
+let state = {tab: 'analytics', currency: 'usd', rangeMin: 0, rangeMax: 1, preset: '3y', perfView: 'main_strategy', perfRollWin: '12M', vcRollWin: 36, corrWindow: '3y', corrView: 'sub_strategy'};
 
 // Date filtering
 function getAllDates(tabKey) {
@@ -809,7 +809,7 @@ const GLOSSARY = {
       ['Cash 3M benchmark', 'USD share class: USD LIBOR 3M (OECD 3-month interbank rate, LIBOR\u2019s successor after its 2023 cessation). EUR share class: Euribor 3M. Monthly averages, % p.a.'],
       ['Monthly cash return', '3M rate of the month × actual days / 360 (money-market convention), compounded month by month.'],
       ['Spread over cash', 'Fund return minus cash return over the same period. Annualized spread = annualized fund return − annualized cash return.'],
-      ['Rolling spread', 'Trailing-window compounded fund return minus compounded cash return over the same window, at each month-end. Window selectable (3M to 5Y); windows above 1Y are annualized.'],
+      ['Rolling spread', 'Trailing-window compounded fund return minus compounded cash return over the same window, at each month-end. Window selectable (1Y to 5Y, default 3Y); windows above 1Y are annualized.'],
       ['Excess Sharpe', 'Annualized mean of monthly (fund − cash) returns / annualized vol of those excess returns — a Sharpe ratio using the actual cash rate as risk-free.'],
       ['% Months > Cash', 'Share of months in which the fund return exceeded the monthly cash return.'],
       ['Data note', 'USD April 2020 is linearly interpolated (missing in source). Refresh rates with scripts/gen_cash3m.py.'],
@@ -1907,7 +1907,7 @@ function computeAnalytics() {
 
 // ============= VS CASH 3M TAB =============
 const CASH_LABEL = {usd:'USD LIBOR 3M', eur:'Euribor 3M'};
-const VC_WINDOWS = {3:'3M', 6:'6M', 12:'1Y', 24:'2Y', 36:'3Y', 60:'5Y'};
+const VC_WINDOWS = {12:'1Y', 24:'2Y', 36:'3Y', 60:'5Y'};
 
 function cashSeries(ccy, win) {
   // Full-history monthly fund vs cash returns, aligned on NAV month-ends
@@ -1935,7 +1935,7 @@ function cashSeries(ccy, win) {
 function renderVsCash(el) {
   const ccy = state.currency;
   const CL = CASH_LABEL[ccy];
-  const win = state.vcRollWin || 12;
+  const win = VC_WINDOWS[state.vcRollWin] ? state.vcRollWin : 36;
   const WL = VC_WINDOWS[win] + (win > 12 ? ' ann.' : '');
   const full = cashSeries(ccy, win);
   const dates = new Set(getFilteredData(RAW.nav).map(r => r.d));
@@ -1973,7 +1973,7 @@ function renderVsCash(el) {
     </div>
     <div class="charts-grid">
       <div class="chart-card full"><div class="chart-header"><h3>${ccy.toUpperCase()} Fund vs ${CL} — Rebased to 100</h3>${chartExportBtns("vcCum","bg_vs_cash_cumulative_"+ccy)}</div><div class="desc">Cumulative performance of the fund vs cash compounded at the 3M rate; shaded area = cumulative excess</div><div class="chart-wrap"><canvas id="vcCumChart"></canvas></div></div>
-      <div class="chart-card full tall"><div class="chart-header"><h3>Rolling ${VC_WINDOWS[win]} Return Spread over ${CL}</h3><div style="display:flex;gap:8px;align-items:center"><label style="font-size:11px;color:var(--text3)">Window</label><select onchange="state.vcRollWin=+this.value;destroyCharts();renderVsCash(document.getElementById('content'))">${Object.entries(VC_WINDOWS).map(([k,l]) => `<option value="${k}" ${+k===win?'selected':''}>${l}</option>`).join('')}</select>${chartExportBtns("vcSpread","bg_vs_cash_spread_"+VC_WINDOWS[win]+"_"+ccy)}</div></div><div class="desc">Trailing ${WL} fund return − trailing ${WL} cash return (bars) · ${WL} fund and cash returns (lines)${win > 12 ? ' · annualized' : ''}</div><div class="chart-wrap"><canvas id="vcSpreadChart"></canvas></div></div>
+      <div class="chart-card full tall"><div class="chart-header"><h3>Rolling ${VC_WINDOWS[win]} Return Spread over ${CL}</h3><div style="display:flex;gap:8px;align-items:center"><label style="font-size:11px;color:var(--text3)">Window</label><select onchange="state.vcRollWin=+this.value;destroyCharts();renderVsCash(document.getElementById('content'))">${Object.entries(VC_WINDOWS).map(([k,l]) => `<option value="${k}" ${+k===win?'selected':''}>${l}</option>`).join('')}</select>${chartExportBtns("vcSpread","bg_vs_cash_spread_"+VC_WINDOWS[win]+"_"+ccy)}</div></div><div class="desc">Trailing ${WL} fund return − trailing ${WL} cash return (bars) · ${WL} fund and cash returns (lines)</div><div class="chart-wrap"><canvas id="vcSpreadChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>Calendar-Year Returns vs Cash</h3>${chartExportBtns("vcAnn","bg_vs_cash_annual_"+ccy)}</div><div class="desc">Compounded within the selected range (partial years marked *)</div><div class="chart-wrap"><canvas id="vcAnnChart"></canvas></div></div>
       <div class="chart-card"><div class="chart-header"><h3>${CL} Rate</h3>${chartExportBtns("vcRate","bg_cash3m_rate_"+ccy)}</div><div class="desc">Monthly average, % p.a.</div><div class="chart-wrap"><canvas id="vcRateChart"></canvas></div></div>
     </div>
